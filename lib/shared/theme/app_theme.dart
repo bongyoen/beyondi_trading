@@ -39,7 +39,6 @@ class AppTheme {
   static const Color _tertiaryDark = Color(0xFF5BD9C6);
   static const Color _surfaceDark = Color(0xFF111318);
   static const Color _surfaceVariantDark = Color(0xFF42474E);
-  static const Color _backgroundDark = Color(0xFF111318);
   static const Color _errorDark = Color(0xFFFFB4AB);
 
   // ── Surface Gradients (for depth) ──
