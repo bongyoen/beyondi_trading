@@ -10,8 +10,8 @@ class UserCredentials {
   const UserCredentials({
     required this.id,
     required this.password,
-  }) : assert(id != '', 'User ID must not be empty'),
-       assert(password != '', 'Password must not be empty');
+  }) : assert(id != '', '아이디는 비워둘 수 없습니다.'),
+       assert(password != '', '비밀번호는 비워둘 수 없습니다.');
 
   /// The user's login identifier.
   final String id;

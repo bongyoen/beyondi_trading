@@ -42,6 +42,12 @@ dependencies:
   # Google Fonts for distinctive typography
   google_fonts: ^6.2.1
 
+  # File system paths for local storage (remember-me)
+  path_provider: ^2.1.5
+
+  # HTTP client for Cloudflare Workers API communication
+  http: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

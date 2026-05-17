@@ -31,7 +31,7 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     // Early Exit: guard against empty input (belt-and-suspenders with
     // UserCredentials assertion)
     if (event.id.isEmpty || event.password.isEmpty) {
-      emit(const LoginFailure(message: 'ID and password are required.'));
+      emit(const LoginFailure(message: '아이디와 비밀번호를 입력해주세요.'));
       return;
     }
 
@@ -51,7 +51,7 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
       emit(LoginFailure(message: e.message));
     } catch (e) {
       // Fail Loud: any unexpected error is surfaced immediately
-      emit(LoginFailure(message: 'An unexpected error occurred. Please try again.'));
+      emit(LoginFailure(message: '예기치 않은 오류가 발생했습니다. 다시 시도해주세요.'));
     }
   }
 

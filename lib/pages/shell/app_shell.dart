@@ -35,11 +35,11 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _pages = [
       const HomePage(),
-      _buildPlaceholder('Portfolio', Icons.pie_chart_rounded),
-      _buildPlaceholder('Markets', Icons.show_chart_rounded),
-      _buildPlaceholder('Trade', Icons.swap_horiz_rounded),
-      _buildPlaceholder('Analytics', Icons.analytics_rounded),
-      _buildPlaceholder('Settings', Icons.settings_rounded),
+      _buildPlaceholder('포트폴리오', Icons.pie_chart_rounded),
+      _buildPlaceholder('마켓', Icons.show_chart_rounded),
+      _buildPlaceholder('거래', Icons.swap_horiz_rounded),
+      _buildPlaceholder('분석', Icons.analytics_rounded),
+      _buildPlaceholder('설정', Icons.settings_rounded),
     ];
   }
 
@@ -98,7 +98,7 @@ class _AppShellState extends State<AppShell> {
         leading: IconButton(
           icon: const Icon(Icons.menu_rounded),
           onPressed: () => scaffoldKey.currentState?.openDrawer(),
-          tooltip: 'Open menu',
+          tooltip: '메뉴 열기',
         ),
         title: Text(
           _pagesTitle[_selectedIndex],
@@ -107,7 +107,7 @@ class _AppShellState extends State<AppShell> {
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {},
-            tooltip: 'Notifications',
+            tooltip: '알림',
           ),
         ],
       ),
@@ -147,7 +147,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onItemSelected(int index) {
-    setState(() => _selectedIndex = index);
+    if (index >= 0 && index < _pages.length) {
+      setState(() => _selectedIndex = index);
+    }
   }
 
   static Widget _buildPlaceholder(String title, IconData icon) {
@@ -167,7 +169,7 @@ class _AppShellState extends State<AppShell> {
           ),
           const SizedBox(height: AppConstants.spacingXs),
           Text(
-            'Coming soon',
+            '준비 중',
             style: GoogleFonts.inter(
               fontSize: 14,
               color: Colors.grey.withValues(alpha: 0.4),
@@ -179,11 +181,11 @@ class _AppShellState extends State<AppShell> {
   }
 
   static const List<String> _pagesTitle = [
-    'Dashboard',
-    'Portfolio',
-    'Markets',
-    'Trade',
-    'Analytics',
-    'Settings',
+    '대시보드',
+    '포트폴리오',
+    '마켓',
+    '거래',
+    '분석',
+    '설정',
   ];
 }

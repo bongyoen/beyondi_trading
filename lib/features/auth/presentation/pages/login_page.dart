@@ -1,9 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../shared/constants/app_constants.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../widgets/common/input_field.dart';
 import '../bloc/login_bloc.dart';
 import '../bloc/login_event.dart';
 import '../bloc/login_state.dart';
@@ -32,6 +37,7 @@ class _LoginPageState extends State<LoginPage>
   final _idController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _rememberMe = false;
 
   late final AnimationController _animController;
   late final Animation<double> _fadeAnimation;
@@ -52,6 +58,32 @@ class _LoginPageState extends State<LoginPage>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
+
+    // Load saved ID from local storage for remember-me
+    _loadSavedId();
+  }
+
+  /// Loads a previously saved ID from local storage.
+  Future<void> _loadSavedId() async {
+    final file = await _storageFile();
+    if (!await file.exists()) return;
+    try {
+      final contents = await file.readAsString();
+      final data = jsonDecode(contents) as Map<String, dynamic>;
+      final savedId = data['saved_id'] as String?;
+      if (savedId != null && savedId.isNotEmpty) {
+        _idController.text = savedId;
+        setState(() => _rememberMe = true);
+      }
+    } catch (_) {
+      // Corrupted storage — fail silently, treat as no saved ID.
+    }
+  }
+
+  /// Returns the File used for persisting remember-me data.
+  Future<File> _storageFile() async {
+    final dir = await getApplicationSupportDirectory();
+    return File('${dir.path}/login_prefs.json');
   }
 
   @override
@@ -174,7 +206,7 @@ class _LoginPageState extends State<LoginPage>
         ),
         const SizedBox(height: AppConstants.spacingXs),
         Text(
-          'Sign in to your account',
+          '로그인하여 계속하세요',
           style: GoogleFonts.inter(
             fontSize: 14,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -191,68 +223,87 @@ class _LoginPageState extends State<LoginPage>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ID Field
-          TextFormField(
+          CommonInputField(
             controller: _idController,
+            label: '아이디',
+            hint: '아이디를 입력하세요',
+            prefixIcon: Icons.person_outline_rounded,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'User ID',
-              hintText: 'Enter your user ID',
-              prefixIcon: Icon(Icons.person_outline_rounded),
-            ),
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
+            enableInteractiveSelection: true,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Please enter your user ID';
+                return '아이디를 입력해주세요';
               }
               return null;
             },
             onChanged: (_) {
-              // Reset error state when user starts typing
               context.read<LoginBloc>().add(const LoginReset());
             },
           ),
           const SizedBox(height: AppConstants.spacingMd),
 
           // Password Field
-          TextFormField(
+          CommonInputField(
             controller: _passwordController,
-            textInputAction: TextInputAction.done,
+            label: '비밀번호',
+            hint: '비밀번호를 입력하세요',
+            prefixIcon: Icons.lock_outline_rounded,
             obscureText: _obscurePassword,
-            decoration: InputDecoration(
-              labelText: 'Password',
-              hintText: 'Enter your password',
-              prefixIcon: const Icon(Icons.lock_outline_rounded),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                ),
-                onPressed: () {
-                  setState(() => _obscurePassword = !_obscurePassword);
-                },
+            textInputAction: TextInputAction.done,
+            enableInteractiveSelection: true,
+            onSubmitted: (_) => _submitLogin(),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
               ),
-            ),
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              color: Theme.of(context).colorScheme.onSurface,
+              onPressed: () {
+                setState(() => _obscurePassword = !_obscurePassword);
+              },
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Please enter your password';
+                return '비밀번호를 입력해주세요';
               }
               return null;
             },
-            onFieldSubmitted: (_) => _submitLogin(),
             onChanged: (_) {
               context.read<LoginBloc>().add(const LoginReset());
             },
           ),
+          const SizedBox(height: AppConstants.spacingSm),
+
+          // Remember Me checkbox
+          _buildRememberMeCheckbox(),
         ],
       ),
+    );
+  }
+
+  Widget _buildRememberMeCheckbox() {
+    return Row(
+      children: [
+        SizedBox(
+          height: 24,
+          width: 24,
+          child: Checkbox(
+            value: _rememberMe,
+            onChanged: (bool? value) {
+              setState(() => _rememberMe = value ?? false);
+            },
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+        const SizedBox(width: AppConstants.spacingXs),
+        Text(
+          '아이디 저장',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 
@@ -304,7 +355,7 @@ class _LoginPageState extends State<LoginPage>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Sign In',
+                            '로그인',
                             style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -358,7 +409,7 @@ class _LoginPageState extends State<LoginPage>
 
         // Demo hint
         return Text(
-          'Demo: any ID and password works',
+          '데모: 모든 아이디와 비밀번호로 로그인 가능',
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
             fontSize: 12,
@@ -380,5 +431,18 @@ class _LoginPageState extends State<LoginPage>
         password: _passwordController.text,
       ),
     );
+
+    // Persist or clear saved ID based on remember-me state
+    _persistRememberedId();
+  }
+
+  /// Saves the ID if [RememberMe] is checked, otherwise clears it.
+  Future<void> _persistRememberedId() async {
+    final file = await _storageFile();
+    final data = <String, dynamic>{};
+    if (_rememberMe) {
+      data['saved_id'] = _idController.text.trim();
+    }
+    await file.writeAsString(jsonEncode(data));
   }
 }

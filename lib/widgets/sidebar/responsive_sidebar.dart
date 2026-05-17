@@ -26,32 +26,32 @@ class _SidebarDestination {
 const List<_SidebarDestination> _destinations = [
   _SidebarDestination(
     icon: Icons.dashboard_rounded,
-    label: 'Dashboard',
+    label: '대시보드',
     section: SidebarSection.main,
   ),
   _SidebarDestination(
     icon: Icons.pie_chart_rounded,
-    label: 'Portfolio',
+    label: '포트폴리오',
     section: SidebarSection.main,
   ),
   _SidebarDestination(
     icon: Icons.show_chart_rounded,
-    label: 'Markets',
+    label: '마켓',
     section: SidebarSection.main,
   ),
   _SidebarDestination(
     icon: Icons.swap_horiz_rounded,
-    label: 'Trade',
+    label: '거래',
     section: SidebarSection.tools,
   ),
   _SidebarDestination(
     icon: Icons.analytics_rounded,
-    label: 'Analytics',
+    label: '분석',
     section: SidebarSection.tools,
   ),
   _SidebarDestination(
     icon: Icons.settings_rounded,
-    label: 'Settings',
+    label: '설정',
     section: SidebarSection.account,
   ),
 ];
@@ -186,7 +186,7 @@ class _SidebarContent extends StatelessWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.only(top: AppConstants.spacingSm),
-              children: _buildSections(colorScheme),
+              children: _buildSections(colorScheme, 0),
             ),
           ),
 
@@ -235,9 +235,9 @@ class _SidebarContent extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildSections(ColorScheme colorScheme) {
+  List<Widget> _buildSections(ColorScheme colorScheme, int startIndex) {
     final List<Widget> sections = [];
-    int index = 0;
+    int destIndex = startIndex;
 
     for (final section in SidebarSection.values) {
       final items = _destinations
@@ -273,11 +273,11 @@ class _SidebarContent extends StatelessWidget {
           SidebarItem(
             icon: dest.icon,
             label: dest.label,
-            isSelected: currentIndex == index,
-            onTap: () => onItemSelected(index),
+            isSelected: currentIndex == destIndex,
+            onTap: () => onItemSelected(destIndex),
           ),
         );
-        index++;
+        destIndex++;
       }
 
       sections.add(const SizedBox(height: AppConstants.spacingXs));
@@ -295,7 +295,7 @@ class _SidebarContent extends StatelessWidget {
   }
 
   Widget _buildUserProfile(ColorScheme colorScheme) {
-    final String displayName = user?.name ?? 'Guest User';
+    final String displayName = user?.name ?? '게스트';
     final String displayEmail = user?.email ?? 'guest@beyondi.com';
 
     return Container(

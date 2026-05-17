@@ -24,7 +24,7 @@ class CounterWidget extends StatelessWidget {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('You have pushed the button this many times:'),
+            const Text('버튼을 이만큼 누르셨습니다:'),
             const SizedBox(height: 8),
             Text(
               '$count',
@@ -37,7 +37,7 @@ class CounterWidget extends StatelessWidget {
                   const CounterIncrementPressed(),
                 );
               },
-              tooltip: 'Increment',
+              tooltip: '증가',
               child: const Icon(Icons.add),
             ),
           ],

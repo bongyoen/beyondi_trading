@@ -29,7 +29,7 @@ class HomePage extends StatelessWidget {
         _buildSectionCard(
           context,
           colorScheme,
-          title: 'Interactive Demo',
+          title: '인터랙티브 데모',
           icon: Icons.touch_app_rounded,
           child: const SizedBox(
             height: 200,
@@ -65,7 +65,7 @@ class HomePage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome back, Trader',
+            '환영합니다, 트레이더님',
             style: GoogleFonts.poppins(
               fontSize: 24,
               fontWeight: FontWeight.w700,
@@ -74,7 +74,7 @@ class HomePage extends StatelessWidget {
           ),
           const SizedBox(height: AppConstants.spacingXs),
           Text(
-            'Here\'s your market overview for today.',
+            '오늘의 시장 개요입니다.',
             style: GoogleFonts.inter(
               fontSize: 14,
               color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
@@ -92,7 +92,7 @@ class HomePage extends StatelessWidget {
           child: _buildStatCard(
             context,
             colorScheme,
-            label: 'Portfolio Value',
+            label: '포트폴리오 가치',
             value: '\$12,450',
             icon: Icons.account_balance_wallet_rounded,
             trend: '+2.4%',
@@ -104,7 +104,7 @@ class HomePage extends StatelessWidget {
           child: _buildStatCard(
             context,
             colorScheme,
-            label: 'Today\'s P&L',
+            label: '오늘의 손익',
             value: '+\$325',
             icon: Icons.trending_up_rounded,
             trend: '+1.8%',
@@ -116,7 +116,7 @@ class HomePage extends StatelessWidget {
           child: _buildStatCard(
             context,
             colorScheme,
-            label: 'Open Positions',
+            label: '진행 중 포지션',
             value: '7',
             icon: Icons.swap_horiz_rounded,
             trend: '2 new',
