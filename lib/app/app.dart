@@ -7,6 +7,7 @@ import '../features/auth/presentation/pages/login_page.dart';
 import '../pages/shell/app_shell.dart';
 import '../shared/theme/app_theme.dart';
 
+// ㅁㄴㅇㅁㄴㅇ
 /// Root application widget.
 ///
 /// Provides theme configuration and top-level auth-aware routing.
