@@ -45,3 +45,4 @@ app.*.map.json
 /android/app/release
 AGENTS.md
 .zed/
+token_payload.json
