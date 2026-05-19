@@ -46,3 +46,7 @@ app.*.map.json
 AGENTS.md
 .zed/
 token_payload.json
+
+# Cloudflare Worker backend
+worker_backend/node_modules/
+worker_backend/.wrangler/

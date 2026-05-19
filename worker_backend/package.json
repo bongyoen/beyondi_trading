@@ -1,0 +1,17 @@
+{
+  "name": "beyondi-trading-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "migrate:local": "wrangler d1 migrations apply beyondi_trading_db --local",
+    "migrate:remote": "wrangler d1 migrations apply beyondi_trading_db --remote",
+    "seed": "curl -X POST https://beyondi-trading-api.kuhj7593.workers.dev/seed"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250401.0",
+    "typescript": "^5.8.0",
+    "wrangler": "^4.0.0"
+  }
+}
