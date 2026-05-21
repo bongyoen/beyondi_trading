@@ -7,8 +7,6 @@ interface User {
 
 interface Env {
   DB: D1Database;
-  AUTH_SESSIONS: KVNamespace;
-  BEYONDI_USERS: KVNamespace;
 }
 
 const corsHeaders = {

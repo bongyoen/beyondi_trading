@@ -50,3 +50,7 @@ token_payload.json
 # Cloudflare Worker backend
 worker_backend/node_modules/
 worker_backend/.wrangler/
+ai_docs/cloudflare.md
+ai_docs/commit_rules.md
+ai_docs/worker_backend.md
+ai_docs/zed_ai.md

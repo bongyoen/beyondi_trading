@@ -7,10 +7,3 @@ binding = "DB"
 database_name = "beyondi_trading_db"
 database_id = "60f22f30-ecbe-4a11-9556-c073e2c8e840"
 
-[[kv_namespaces]]
-binding = "AUTH_SESSIONS"
-id = "b54e162bdc6d440c826870a56843d040"
-
-[[kv_namespaces]]
-binding = "BEYONDI_USERS"
-id = "bb1c01ca931e467d9e06d4e825af51a6"
