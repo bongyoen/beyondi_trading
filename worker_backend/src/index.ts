@@ -5,6 +5,16 @@ interface User {
   created_at: string;
 }
 
+interface KisAuth {
+  user_id: string;
+  app_key: string;
+  app_secret: string;
+  access_token: string | null;
+  token_expiry: string | null;
+  is_paper: number;
+  connected_at: string;
+}
+
 interface Env {
   DB: D1Database;
 }
@@ -142,6 +152,93 @@ async function handleSeed(env: Env): Promise<Response> {
   return jsonResponse({ message: `Seeded ${created} users` });
 }
 
+// ── KIS Auth ────────────────────────────────────────────────────────
+
+async function handleKisAuthSave(request: Request, env: Env): Promise<Response> {
+  try {
+    const body = (await request.json()) as {
+      user_id?: string;
+      app_key?: string;
+      app_secret?: string;
+      access_token?: string;
+      token_expiry?: string;
+      is_paper?: boolean;
+    };
+
+    if (!body.user_id || !body.app_key || !body.app_secret) {
+      return errorResponse('user_id, app_key, and app_secret are required');
+    }
+
+    const now = new Date().toISOString();
+
+    await env.DB.prepare(
+      `INSERT INTO kis_auth (user_id, app_key, app_secret, access_token, token_expiry, is_paper, connected_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         app_key = excluded.app_key,
+         app_secret = excluded.app_secret,
+         access_token = excluded.access_token,
+         token_expiry = excluded.token_expiry,
+         is_paper = excluded.is_paper,
+         connected_at = excluded.connected_at`,
+    ).bind(
+      body.user_id,
+      body.app_key,
+      body.app_secret,
+      body.access_token || null,
+      body.token_expiry || null,
+      body.is_paper === false ? 0 : 1,
+      now,
+    ).run();
+
+    return jsonResponse({ message: 'KIS credentials saved', connected_at: now });
+  } catch {
+    return errorResponse('Invalid request body', 400);
+  }
+}
+
+async function handleKisAuthGet(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const userId = url.searchParams.get('user_id');
+
+  if (!userId) {
+    return errorResponse('user_id query parameter is required');
+  }
+
+  const auth = await env.DB.prepare(
+    'SELECT * FROM kis_auth WHERE user_id = ?',
+  ).bind(userId).first<KisAuth>();
+
+  if (!auth) {
+    return jsonResponse({ connected: false });
+  }
+
+  return jsonResponse({
+    connected: true,
+    app_key: auth.app_key,
+    access_token: auth.access_token,
+    token_expiry: auth.token_expiry,
+    is_paper: auth.is_paper === 1,
+    connected_at: auth.connected_at,
+  });
+}
+
+async function handleKisAuthDelete(request: Request, env: Env): Promise<Response> {
+  try {
+    const body = (await request.json()) as { user_id?: string };
+    if (!body.user_id) {
+      return errorResponse('user_id is required');
+    }
+
+    await env.DB.prepare('DELETE FROM kis_auth WHERE user_id = ?').bind(body.user_id).run();
+    return jsonResponse({ message: 'KIS credentials deleted' });
+  } catch {
+    return errorResponse('Invalid request body', 400);
+  }
+}
+
+// ── Router ──────────────────────────────────────────────────────────
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === 'OPTIONS') {
@@ -151,16 +248,26 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // Auth
     if (path === '/auth/register' && request.method === 'POST') {
       return handleAuthRegister(request, env);
     }
-
     if (path === '/auth/login' && request.method === 'POST') {
       return handleAuthLogin(request, env);
     }
-
     if (path === '/seed' && request.method === 'POST') {
       return handleSeed(env);
+    }
+
+    // KIS Auth
+    if (path === '/kis/auth' && request.method === 'POST') {
+      return handleKisAuthSave(request, env);
+    }
+    if (path === '/kis/auth' && request.method === 'GET') {
+      return handleKisAuthGet(request, env);
+    }
+    if (path === '/kis/auth' && request.method === 'DELETE') {
+      return handleKisAuthDelete(request, env);
     }
 
     return jsonResponse({ message: 'Beyondi Trading API' });
