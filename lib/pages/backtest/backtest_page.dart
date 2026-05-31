@@ -176,7 +176,12 @@ class _BacktestPageState extends State<BacktestPage> {
     if (_candles == null || _candles!.isEmpty) return;
     final ts = double.tryParse(_tickCtl.text) ?? 100;
     final symbol = _symbolCtl.text.trim();
-    final result = runBacktest(candles: _candles!, tickSize: ts);
+    final result = runBacktest(
+      candles: _candles!,
+      tickSize: ts,
+      stopLossPercent: 5,
+      closeAtEndOfDay: true,
+    );
     _cache.saveResult(symbol: symbol, tickSize: ts, result: result);
     setState(() { _result = result; });
   }

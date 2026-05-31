@@ -12,11 +12,15 @@ import 'calculate_vwap.dart';
 ///   - 현재가 > VWAP && 현재가 > POC → 강한 매도 신호 (short 진입)
 ///   - 현재가 < VWAP && 현재가 < POC → 강한 매수 신호 (long 진입)
 ///   - 그 외 → 중립 (포지션 유지 또는 미진입)
+///   - [stopLossPercent] (기본 0 = 미사용): 손실 N% 도달 시 강제 청산
+///   - [closeAtEndOfDay]: true면 장 종료 시 포지션 청산
 ///
 /// Atomic Predictability: 동일한 캔들 데이터 → 동일한 결과.
 BacktestResult runBacktest({
   required List<Candle> candles,
   double tickSize = 1.0,
+  double stopLossPercent = 0,
+  bool closeAtEndOfDay = false,
 }) {
   if (candles.isEmpty) {
     return const BacktestResult(
@@ -38,10 +42,51 @@ BacktestResult runBacktest({
   double? entryPrice;
   DateTime? entryTime;
 
+  void closePosition(double exitPrice, DateTime exitTime) {
+    if (currentPosition == null || entryPrice == null || entryTime == null) return;
+    final pnl = _calculatePnl(
+      signal: currentPosition!,
+      entryPrice: entryPrice!,
+      exitPrice: exitPrice,
+    );
+    trades.add(TradeRecord(
+      entryTime: entryTime!,
+      exitTime: exitTime,
+      entryPrice: entryPrice!,
+      exitPrice: exitPrice,
+      signal: currentPosition!,
+      pnl: pnl,
+    ));
+    currentPosition = null;
+    entryPrice = null;
+    entryTime = null;
+  }
+
   for (int i = 0; i < candles.length; i++) {
     final candle = candles[i];
     final vwap = vwapResult.vwapSeries[i];
     final poc = vwapResult.pocSeries[i];
+    final isLastOfDay = closeAtEndOfDay && (i + 1 >= candles.length ||
+        candles[i + 1].timestamp.year != candle.timestamp.year ||
+        candles[i + 1].timestamp.month != candle.timestamp.month ||
+        candles[i + 1].timestamp.day != candle.timestamp.day);
+
+    // Stop Loss 체크
+    if (currentPosition != null && stopLossPercent > 0) {
+      final pnlPct = _calculatePnlPercent(
+        signal: currentPosition!,
+        entryPrice: entryPrice ?? 0,
+        currentPrice: candle.close,
+      );
+      if (pnlPct <= -stopLossPercent) {
+        closePosition(candle.close, candle.timestamp);
+      }
+    }
+
+    // 장 마감 청산
+    if (currentPosition != null && isLastOfDay) {
+      closePosition(candle.close, candle.timestamp);
+    }
 
     // 신호 결정
     final signal = _determineSignal(
@@ -50,55 +95,35 @@ BacktestResult runBacktest({
       poc: poc,
     );
 
-    if (signal == TradeSignal.neutral) {
-      continue; // 중립: 아무 것도 하지 않음
-    }
+    if (signal == TradeSignal.neutral) continue;
 
     if (currentPosition == null) {
-      // 포지션 없음 → 신호 방향으로 진입
       currentPosition = signal;
       entryPrice = candle.close;
       entryTime = candle.timestamp;
     } else if (signal != currentPosition) {
-      // 반대 신호 → 기존 포지션 청산 후 반대 방향 진입
-      final pnl = _calculatePnl(
-        signal: currentPosition,
-        entryPrice: entryPrice!,
-        exitPrice: candle.close,
-      );
-
-      trades.add(TradeRecord(
-        entryTime: entryTime!,
-        exitTime: candle.timestamp,
-        entryPrice: entryPrice,
-        exitPrice: candle.close,
-        signal: currentPosition,
-        pnl: pnl,
-      ));
-
-      // 반대 방향으로 새 포지션 진입
+      closePosition(candle.close, candle.timestamp);
       currentPosition = signal;
       entryPrice = candle.close;
       entryTime = candle.timestamp;
     }
-    // 같은 신호면 포지션 유지 (hold)
   }
 
   // 3. 마지막 포지션 청산 (마지막 캔들 종가 기준)
   if (currentPosition != null && entryPrice != null && entryTime != null) {
     final lastCandle = candles.last;
     final pnl = _calculatePnl(
-      signal: currentPosition,
-      entryPrice: entryPrice,
+      signal: currentPosition!,
+      entryPrice: entryPrice!,
       exitPrice: lastCandle.close,
     );
 
     trades.add(TradeRecord(
-      entryTime: entryTime,
+      entryTime: entryTime!,
       exitTime: lastCandle.timestamp,
-      entryPrice: entryPrice,
+      entryPrice: entryPrice!,
       exitPrice: lastCandle.close,
-      signal: currentPosition,
+      signal: currentPosition!,
       pnl: pnl,
     ));
   }
@@ -175,4 +200,15 @@ double _calculatePnl({
   return signal == TradeSignal.strongBuy
       ? exitPrice - entryPrice
       : entryPrice - exitPrice;
+}
+
+/// 포지션 방향에 따른 손익률(%) 계산.
+double _calculatePnlPercent({
+  required TradeSignal signal,
+  required double entryPrice,
+  required double currentPrice,
+}) {
+  if (entryPrice == 0) return 0;
+  final pnl = _calculatePnl(signal: signal, entryPrice: entryPrice, exitPrice: currentPrice);
+  return pnl / entryPrice * 100;
 }
