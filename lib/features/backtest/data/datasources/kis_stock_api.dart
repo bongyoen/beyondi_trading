@@ -142,19 +142,36 @@ class KisStockApi {
     return rawList.map((e) => _parseCandle(e as Map<String, dynamic>)).toList();
   }
 
-  /// 국내 주식 분봉 데이터를 조회한다.
+  /// 국내 주식 분봉 데이터를 조회한다 (하루 전체).
   ///
   /// [symbol] 종목코드 (ex. '005930')
   /// [date]   조회할 날짜
-  /// [startTime] 시작 시간 (HHmmss, ex. '090000')
   ///
   /// **실전(prod) 환경에서만 동작**. 모의투자 미지원.
-  /// 한 번 호출에 최대 120건, 최대 1년 전까지 조회 가능.
+  /// 최대 1년 전까지 조회 가능.
+  /// API 1회 최대 120건 → 2시간 단위 4회 호출로 하루 전체 수집.
   Future<List<Candle>> fetchMinuteCandles({
     required String symbol,
     required DateTime date,
-    String startTime = '090000',
-    bool includePastData = false,
+  }) async {
+    final all = <Candle>[];
+    // 2시간 간격으로 4회 호출 (09:00~15:30 커버)
+    for (final startTime in ['153000', '133000', '113000', '093000']) {
+      final chunk = await _fetchMinuteChunk(symbol: symbol, date: date, startTime: startTime);
+      for (final c in chunk) {
+        if (!all.any((e) => e.timestamp == c.timestamp)) all.add(c);
+      }
+    }
+    all.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return all;
+  }
+
+  /// 분봉 1회 조회 (최대 120건).
+  Future<List<Candle>> _fetchMinuteChunk({
+    required String symbol,
+    required DateTime date,
+    required String startTime,
+    bool includePast = false,
   }) async {
     final token = await getToken();
 
@@ -165,34 +182,26 @@ class KisStockApi {
       'FID_INPUT_ISCD': symbol,
       'FID_INPUT_HOUR_1': startTime,
       'FID_INPUT_DATE_1': _formatDate(date),
-      'FID_PW_DATA_INCU_YN': includePastData ? 'Y' : 'N',
+      'FID_PW_DATA_INCU_YN': includePast ? 'Y' : 'N',
       'FID_FAKE_TICK_INCU_YN': '',
     });
 
-    final response = await _client.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': 'Bearer $token',
-        'appkey': appKey,
-        'appsecret': appSecret,
-        'custtype': 'P',
-        'tr_id': 'FHKST03010230',
-      },
-    );
+    final response = await _client.get(uri, headers: {
+      'Content-Type': 'application/json',
+      'authorization': 'Bearer $token',
+      'appkey': appKey,
+      'appsecret': appSecret,
+      'custtype': 'P',
+      'tr_id': 'FHKST03010230',
+    });
 
     if (response.statusCode != 200) {
-      throw KisApiException(
-        '분봉 데이터 조회 실패: ${response.statusCode} ${response.body}',
-      );
+      throw KisApiException('분봉 조회 실패: ${response.statusCode} ${response.body}');
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
-
     if (body['rt_cd'] != '0') {
-      throw KisApiException(
-        'API 오류: [${body['msg_cd']}] ${body['msg1']}',
-      );
+      throw KisApiException('API 오류: [${body['msg_cd']}] ${body['msg1']}');
     }
 
     final rawList = body['output2'] as List<dynamic>;

@@ -3,11 +3,15 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../../domain/entities/backtest_result.dart';
 import '../../domain/entities/candle.dart';
+import '../../domain/entities/trade_record.dart';
+import '../../domain/entities/trade_signal.dart';
 
-/// 캔들 데이터 로컬 JSON 파일 캐시.
+/// 캔들 데이터 + 백테스트 결과 로컬 JSON 파일 캐시.
 ///
-/// `{symbol}_{start}_{end}_{interval}.json` 형태로 저장.
+/// - 캔들: `candle_{symbol}_{start}{end}_1d.json`
+/// - 결과: `result_{symbol}_{tickSize}.json`
 class CandleCache {
   CandleCache._();
 
@@ -88,4 +92,96 @@ class CandleCache {
         close: (m['c'] as num).toDouble(),
         volume: (m['v'] as num).toDouble(),
       );
+
+  // ── BacktestResult ──────────────────────────────────────────────
+
+  String _resultFile({
+    required String symbol,
+    required double tickSize,
+  }) =>
+      'result_${symbol}_${tickSize.toStringAsFixed(0)}.json';
+
+  /// 저장된 백테스트 결과 로드.
+  Future<BacktestResult?> loadResult({
+    required String symbol,
+    required double tickSize,
+  }) async {
+    try {
+      final dir = await _getDir();
+      final file = File('${dir.path}/${_resultFile(symbol: symbol, tickSize: tickSize)}');
+      if (!await file.exists()) return null;
+      final raw = await file.readAsString();
+      return _resultFromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 백테스트 결과 저장.
+  Future<void> saveResult({
+    required String symbol,
+    required double tickSize,
+    required BacktestResult result,
+  }) async {
+    try {
+      final dir = await _getDir();
+      final file = File('${dir.path}/${_resultFile(symbol: symbol, tickSize: tickSize)}');
+      await file.writeAsString(jsonEncode(_resultToJson(result)));
+    } catch (_) {}
+  }
+
+  Map<String, dynamic> _resultToJson(BacktestResult r) => {
+        'totalReturn': r.totalReturn,
+        'winRate': r.winRate,
+        'totalSignals': r.totalSignals,
+        'maxDrawdown': r.maxDrawdown,
+        'sharpeRatio': r.sharpeRatio,
+        'trades': r.trades.map(_tradeToJson).toList(),
+      };
+
+  BacktestResult _resultFromJson(Map<String, dynamic> m) => BacktestResult(
+        totalReturn: (m['totalReturn'] as num).toDouble(),
+        winRate: (m['winRate'] as num).toDouble(),
+        totalSignals: m['totalSignals'] as int,
+        maxDrawdown: (m['maxDrawdown'] as num).toDouble(),
+        sharpeRatio: (m['sharpeRatio'] as num).toDouble(),
+        trades: (m['trades'] as List<dynamic>)
+            .map((e) => _tradeFromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+  Map<String, dynamic> _tradeToJson(TradeRecord t) => {
+        'entryTime': t.entryTime.toIso8601String(),
+        'exitTime': t.exitTime.toIso8601String(),
+        'entryPrice': t.entryPrice,
+        'exitPrice': t.exitPrice,
+        'signal': t.signal.name,
+        'pnl': t.pnl,
+      };
+
+  TradeRecord _tradeFromJson(Map<String, dynamic> m) => TradeRecord(
+        entryTime: DateTime.parse(m['entryTime'] as String),
+        exitTime: DateTime.parse(m['exitTime'] as String),
+        entryPrice: (m['entryPrice'] as num).toDouble(),
+        exitPrice: (m['exitPrice'] as num).toDouble(),
+        signal: m['signal'] == 'strongBuy' ? TradeSignal.strongBuy : TradeSignal.strongSell,
+        pnl: (m['pnl'] as num).toDouble(),
+      );
+
+  /// 캔들 + 결과 파일 삭제.
+  Future<void> delete({
+    required String symbol,
+    required DateTime start,
+    required DateTime end,
+    required double tickSize,
+    String interval = '1d',
+  }) async {
+    try {
+      final dir = await _getDir();
+      final cf = File('${dir.path}/${_fileName(symbol: symbol, start: start, end: end, interval: interval)}');
+      if (await cf.exists()) await cf.delete();
+      final rf = File('${dir.path}/${_resultFile(symbol: symbol, tickSize: tickSize)}');
+      if (await rf.exists()) await rf.delete();
+    } catch (_) {}
+  }
 }

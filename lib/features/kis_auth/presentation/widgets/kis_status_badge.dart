@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
@@ -321,6 +322,41 @@ class _KisStatusBadgeState extends State<KisStatusBadge> {
               '토큰 만료',
               conn.tokenExpiry?.toLocal().toString().substring(0, 19) ?? '-',
             ),
+            if (conn.accessToken != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(children: [
+                  const SizedBox(width: 80, child: Text('액세스 토큰', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: conn.accessToken!));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('토큰이 클립보드에 복사되었습니다'), duration: Duration(seconds: 2)),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Expanded(
+                            child: Text(
+                              '${conn.accessToken!.substring(0, 20)}...',
+                              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.copy_rounded, size: 14),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
             _infoRow('남은 시간', conn.expiryRemaining),
             _infoRow('상태', conn.isTokenValid ? '유효' : '만료'),
           ],
