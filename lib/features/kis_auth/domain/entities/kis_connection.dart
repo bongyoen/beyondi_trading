@@ -2,14 +2,18 @@
 class KisConnection {
   const KisConnection({
     required this.appKey,
+    required this.appSecret,
     this.accessToken,
     this.tokenExpiry,
     this.isPaper = true,
     required this.connectedAt,
   });
 
-  /// 앱키 (마스킹된 앞뒤 4자리 표시용)
+  /// 앱키
   final String appKey;
+
+  /// 앱시크릿
+  final String appSecret;
 
   /// 발급된 액세스 토큰
   final String? accessToken;

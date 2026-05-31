@@ -216,6 +216,7 @@ async function handleKisAuthGet(request: Request, env: Env): Promise<Response> {
   return jsonResponse({
     connected: true,
     app_key: auth.app_key,
+    app_secret: auth.app_secret,
     access_token: auth.access_token,
     token_expiry: auth.token_expiry,
     is_paper: auth.is_paper === 1,

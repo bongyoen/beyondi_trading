@@ -5,274 +5,153 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../entities/user.dart';
 import '../../../features/auth/presentation/bloc/login_state.dart';
 import '../../../features/auth/presentation/bloc/login_bloc.dart';
-import '../../../features/kis_auth/presentation/bloc/kis_auth_bloc.dart';
-import '../../../features/kis_auth/presentation/bloc/kis_auth_event.dart';
 import '../../../features/kis_auth/presentation/widgets/kis_status_badge.dart';
 import '../../../shared/constants/app_constants.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../widgets/sidebar/responsive_sidebar.dart';
+import '../backtest/backtest_page.dart';
 import '../home/home_page.dart';
 
-/// Responsive application shell with a persistent sidebar on desktop
-/// and a drawer-based navigation on mobile.
-///
-/// Adapts to screen width using [AppConstants.mobileBreakpoint]:
-/// - Desktop (>= 768px): Fixed sidebar + content area
-/// - Mobile (< 768px): Hamburger menu + Drawer sidebar
-///
-/// Follows the 5 Pillars:
-/// - Typography: Poppins headings, Inter body
-/// - Color: Bold sidebar gradient vs clean content surface
-/// - Motion: Smooth sidebar entrance, drawer slide, content transitions
-/// - Space: Generous content padding, controlled sidebar density
-/// - Depth: Sidebar gradient shadow, content subtle surface gradient
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
-
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
-  late final List<Widget> _pages;
 
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      const HomePage(),
-      _buildPlaceholder('포트폴리오', Icons.pie_chart_rounded),
-      _buildPlaceholder('마켓', Icons.show_chart_rounded),
-      _buildPlaceholder('거래', Icons.swap_horiz_rounded),
-      _buildPlaceholder('분석', Icons.analytics_rounded),
-      _buildPlaceholder('설정', Icons.settings_rounded),
-    ];
-    _loadKisStatus();
+  static Widget _ph(String title, IconData icon) {
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 64, color: Colors.grey.withValues(alpha: 0.3)),
+        const SizedBox(height: 16),
+        Text(title, style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.grey.withValues(alpha: 0.5))),
+        const SizedBox(height: 4),
+        Text('준비 중', style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.withValues(alpha: 0.4))),
+      ]),
+    );
   }
 
-  void _loadKisStatus() {
-    final authState = context.read<LoginBloc>().state;
-    if (authState is LoginSuccess) {
-      context.read<KisAuthBloc>().add(KisStatusRequested(userId: authState.user.id));
-    }
+  static const List<String> _titles = [
+    '대시보드', '포트폴리오', '마켓', '거래', '분석', '백테스트', '설정',
+  ];
+
+  List<Widget> get _pages => [
+    const HomePage(),
+    _ph('포트폴리오', Icons.pie_chart_rounded),
+    _ph('마켓', Icons.show_chart_rounded),
+    _ph('거래', Icons.swap_horiz_rounded),
+    _ph('분석', Icons.analytics_rounded),
+    const BacktestPage(),
+    _ph('설정', Icons.settings_rounded),
+  ];
+
+  User? get _user {
+    final s = context.read<LoginBloc>().state;
+    return s is LoginSuccess ? s.user : null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile =
-        MediaQuery.of(context).size.width < AppConstants.mobileBreakpoint;
-
+    final mobile = MediaQuery.of(context).size.width < AppConstants.mobileBreakpoint;
     return LayoutBuilder(
-      builder: (context, constraints) {
-        if (isMobile) {
-          return _buildMobileLayout();
-        }
-        return _buildDesktopLayout();
-      },
+      builder: (_, __) => mobile ? _mobile() : _desktop(),
     );
   }
 
-  /// Desktop layout: fixed sidebar + header bar + content.
-  Widget _buildDesktopLayout() {
-    final user = _currentUser;
-
-    return Row(
-      children: [
-        // ── Persistent Sidebar ──
-        SizedBox(
-          width: AppConstants.sidebarWidth,
-          child: ResponsiveSidebar(
-            currentIndex: _selectedIndex,
-            onItemSelected: _onItemSelected,
-          ),
+  Widget _desktop() {
+    return Row(children: [
+      SizedBox(
+        width: AppConstants.sidebarWidth,
+        child: ResponsiveSidebar(
+          currentIndex: _selectedIndex,
+          onItemSelected: (i) => setState(() => _selectedIndex = i),
         ),
-
-        // ── Main Area (Header + Content) ──
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: AppTheme.surfaceGradient(
-                Theme.of(context).brightness == Brightness.dark,
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  _buildHeaderBar(user),
-                  Expanded(child: _buildContentArea()),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  User? get _currentUser {
-    final authState = context.read<LoginBloc>().state;
-    return authState is LoginSuccess ? authState.user : null;
-  }
-
-  /// KIS 상태 뱃지 (연결/미연결/오류).
-  Widget _kisBadge() {
-    final user = _currentUser;
-    if (user == null) return const SizedBox.shrink();
-    return KisStatusBadge(user: user);
-  }
-
-  /// 상단 헤더 바 — 사용자 인사말 + KIS 연결 상태.
-  Widget _buildHeaderBar(User? user) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final displayName = user?.name ?? '트레이더';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.spacingLg,
-        vertical: AppConstants.spacingSm,
       ),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.1),
+      Expanded(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: AppTheme.surfaceGradient(Theme.of(context).brightness == Brightness.dark),
+          ),
+          child: SafeArea(
+            child: Column(children: [
+              _topBar(),
+              Expanded(child: _body()),
+            ]),
           ),
         ),
       ),
-      child: Row(
-        children: [
-          Icon(Icons.trending_up_rounded, size: 20, color: colorScheme.primary),
-          const SizedBox(width: AppConstants.spacingSm),
-          Text(
-            'Beyondi Trading',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            '$displayName 님',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(width: AppConstants.spacingSm),
-          _kisBadge(),
-          const SizedBox(width: AppConstants.spacingSm),
-          IconButton(
-            icon: Icon(Icons.notifications_outlined, size: 20, color: colorScheme.onSurfaceVariant),
-            onPressed: () {},
-            tooltip: '알림',
-          ),
-        ],
-      ),
-    );
+    ]);
   }
 
-  /// Mobile layout: scaffold with drawer and app bar.
-  Widget _buildMobileLayout() {
-    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
-
+  Widget _mobile() {
+    final key = GlobalKey<ScaffoldState>();
     return Scaffold(
-      key: scaffoldKey,
+      key: key,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu_rounded),
-          onPressed: () => scaffoldKey.currentState?.openDrawer(),
-          tooltip: '메뉴 열기',
+          onPressed: () => key.currentState?.openDrawer(),
         ),
-        title: Text(_pagesTitle[_selectedIndex]),
+        title: Text(_titles[_selectedIndex]),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: _kisBadge(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
-            tooltip: '알림',
-          ),
+          _kis(),
+          IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
         ],
       ),
       drawer: Drawer(
         child: ResponsiveSidebar(
           currentIndex: _selectedIndex,
-          onItemSelected: (index) {
-            _onItemSelected(index);
-            Navigator.of(context).pop(); // Close drawer
+          onItemSelected: (i) {
+            setState(() => _selectedIndex = i);
+            Navigator.of(context).pop();
           },
         ).showAsDrawer(context),
       ),
-      body: _buildContentArea(),
+      body: _body(),
     );
   }
 
-  /// Shared content area with animated page switching.
-  Widget _buildContentArea() {
+  Widget _kis() {
+    final u = _user;
+    return u == null ? const SizedBox() : KisStatusBadge(user: u);
+  }
+
+  Widget _topBar() {
+    final cs = Theme.of(context).colorScheme;
+    final name = _user?.name ?? '트레이더';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(bottom: BorderSide(color: cs.outline.withValues(alpha: 0.1))),
+      ),
+      child: Row(children: [
+        Text('Beyondi Trading', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+        SizedBox(width: 12),
+        TextButton(
+          style: TextButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          onPressed: () {
+            final maxIdx = _pages.length - 1;
+            setState(() => _selectedIndex = _selectedIndex >= maxIdx ? 0 : _selectedIndex + 1);
+          },
+          child: Text('$_selectedIndex', style: TextStyle(fontSize: 11, color: cs.primary)),
+        ),
+        Spacer(),
+        Text('$name 님', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+        SizedBox(width: 8),
+        _kis(),
+        SizedBox(width: 4),
+        IconButton(icon: Icon(Icons.notifications_outlined, size: 20, color: cs.onSurfaceVariant), onPressed: () {}),
+      ]),
+    );
+  }
+
+  Widget _body() {
     return Padding(
       padding: const EdgeInsets.all(AppConstants.spacingLg),
-      child: AnimatedSwitcher(
-        duration: AppConstants.defaultAnimationDuration,
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
-        },
-        child: KeyedSubtree(
-          key: ValueKey<int>(_selectedIndex),
-          child: _pages[_selectedIndex],
-        ),
-      ),
+      child: IndexedStack(index: _selectedIndex, children: _pages),
     );
   }
-
-  void _onItemSelected(int index) {
-    if (index >= 0 && index < _pages.length) {
-      setState(() => _selectedIndex = index);
-    }
-  }
-
-  static Widget _buildPlaceholder(String title, IconData icon) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 64, color: Colors.grey.withValues(alpha: 0.3)),
-          const SizedBox(height: AppConstants.spacingMd),
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.withValues(alpha: 0.5),
-            ),
-          ),
-          const SizedBox(height: AppConstants.spacingXs),
-          Text(
-            '준비 중',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: Colors.grey.withValues(alpha: 0.4),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static const List<String> _pagesTitle = [
-    '대시보드',
-    '포트폴리오',
-    '마켓',
-    '거래',
-    '분석',
-    '설정',
-  ];
 }

@@ -134,9 +134,9 @@ class _KisStatusBadgeState extends State<KisStatusBadge> {
   void _showConnectDialog(BuildContext context) {
     final appKeyController = TextEditingController();
     final appSecretController = TextEditingController();
-    bool isPaper = true;
     bool hideSecret = true;
-    // 설정 파일에서 기존 키 로드
+    // 설정 파일에서 기존 키 로드 (isPaper 기본값: false=실전)
+    bool isPaper = false;
     _loadKisConfig().then((cfg) {
       if (cfg != null) {
         appKeyController.text = cfg.$1;

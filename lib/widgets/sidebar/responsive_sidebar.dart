@@ -50,6 +50,11 @@ const List<_SidebarDestination> _destinations = [
     section: SidebarSection.tools,
   ),
   _SidebarDestination(
+    icon: Icons.science_rounded,
+    label: '백테스트',
+    section: SidebarSection.tools,
+  ),
+  _SidebarDestination(
     icon: Icons.settings_rounded,
     label: '설정',
     section: SidebarSection.account,
@@ -269,12 +274,13 @@ class _SidebarContent extends StatelessWidget {
 
       // Items in this section
       for (final dest in items) {
+        final idx = destIndex;
         sections.add(
           SidebarItem(
             icon: dest.icon,
             label: dest.label,
-            isSelected: currentIndex == destIndex,
-            onTap: () => onItemSelected(destIndex),
+            isSelected: currentIndex == idx,
+            onTap: () => onItemSelected(idx),
           ),
         );
         destIndex++;

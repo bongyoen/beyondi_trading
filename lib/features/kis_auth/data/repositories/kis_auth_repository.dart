@@ -61,6 +61,7 @@ class WorkersKisAuthRepository implements KisAuthRepository {
 
     return KisConnection(
       appKey: appKey,
+      appSecret: appSecret,
       accessToken: token,
       tokenExpiry: kisApi.tokenExpiry,
       isPaper: isPaper,
@@ -128,6 +129,7 @@ class WorkersKisAuthRepository implements KisAuthRepository {
 
     return KisConnection(
       appKey: rawKey,
+      appSecret: body['app_secret'] as String? ?? '',
       accessToken: body['access_token'] as String?,
       tokenExpiry:
           (rawExpiry is String) ? DateTime.tryParse(rawExpiry) : null,

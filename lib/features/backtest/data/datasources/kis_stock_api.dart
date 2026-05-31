@@ -142,7 +142,66 @@ class KisStockApi {
     return rawList.map((e) => _parseCandle(e as Map<String, dynamic>)).toList();
   }
 
-  /// KIS 응답 Map → Candle 엔티티 변환.
+  /// 국내 주식 분봉 데이터를 조회한다.
+  ///
+  /// [symbol] 종목코드 (ex. '005930')
+  /// [date]   조회할 날짜
+  /// [startTime] 시작 시간 (HHmmss, ex. '090000')
+  ///
+  /// **실전(prod) 환경에서만 동작**. 모의투자 미지원.
+  /// 한 번 호출에 최대 120건, 최대 1년 전까지 조회 가능.
+  Future<List<Candle>> fetchMinuteCandles({
+    required String symbol,
+    required DateTime date,
+    String startTime = '090000',
+    bool includePastData = false,
+  }) async {
+    final token = await getToken();
+
+    final uri = Uri.parse(
+      '$_baseUrl/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice',
+    ).replace(queryParameters: {
+      'FID_COND_MRKT_DIV_CODE': 'J',
+      'FID_INPUT_ISCD': symbol,
+      'FID_INPUT_HOUR_1': startTime,
+      'FID_INPUT_DATE_1': _formatDate(date),
+      'FID_PW_DATA_INCU_YN': includePastData ? 'Y' : 'N',
+      'FID_FAKE_TICK_INCU_YN': '',
+    });
+
+    final response = await _client.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': 'Bearer $token',
+        'appkey': appKey,
+        'appsecret': appSecret,
+        'custtype': 'P',
+        'tr_id': 'FHKST03010230',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw KisApiException(
+        '분봉 데이터 조회 실패: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (body['rt_cd'] != '0') {
+      throw KisApiException(
+        'API 오류: [${body['msg_cd']}] ${body['msg1']}',
+      );
+    }
+
+    final rawList = body['output2'] as List<dynamic>;
+    return rawList
+        .map((e) => _parseMinuteCandle(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// KIS 응답 Map → Candle 엔티티 변환 (일봉).
   Candle _parseCandle(Map<String, dynamic> data) {
     final dateStr = data['stck_bsop_date'];
     if (dateStr is! String || dateStr.length < 8) {
@@ -160,6 +219,32 @@ class KisStockApi {
       low: _parseDouble(data['stck_lwpr']),
       close: _parseDouble(data['stck_clpr']),
       volume: _parseDouble(data['acml_vol']),
+    );
+  }
+
+  /// KIS 응답 Map → Candle 엔티티 변환 (분봉).
+  Candle _parseMinuteCandle(Map<String, dynamic> data) {
+    final dateStr = data['stck_bsop_date'];
+    if (dateStr is! String || dateStr.length < 8) {
+      throw KisApiException('잘못된 분봉 데이터: stck_bsop_date=$dateStr');
+    }
+
+    final timeStr = data['stck_cntg_hour'] as String? ?? '000000';
+
+    return Candle(
+      timestamp: DateTime(
+        int.parse(dateStr.substring(0, 4)),
+        int.parse(dateStr.substring(4, 6)),
+        int.parse(dateStr.substring(6, 8)),
+        int.parse(timeStr.substring(0, 2)),
+        int.parse(timeStr.substring(2, 4)),
+        int.parse(timeStr.substring(4, 6)),
+      ),
+      open: _parseDouble(data['stck_oprc']),
+      high: _parseDouble(data['stck_hgpr']),
+      low: _parseDouble(data['stck_lwpr']),
+      close: _parseDouble(data['stck_prpr']),
+      volume: _parseDouble(data['cntg_vol']),
     );
   }
 
