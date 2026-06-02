@@ -11,6 +11,7 @@ import '../../../shared/theme/app_theme.dart';
 import '../../../widgets/sidebar/responsive_sidebar.dart';
 import '../backtest/backtest_page.dart';
 import '../home/home_page.dart';
+import '../ui_components/ui_components_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -33,10 +34,6 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  static const List<String> _titles = [
-    '대시보드', '포트폴리오', '마켓', '거래', '분석', '백테스트', '설정',
-  ];
-
   List<Widget> get _pages => [
     const HomePage(),
     _ph('포트폴리오', Icons.pie_chart_rounded),
@@ -44,7 +41,12 @@ class _AppShellState extends State<AppShell> {
     _ph('거래', Icons.swap_horiz_rounded),
     _ph('분석', Icons.analytics_rounded),
     const BacktestPage(),
+    const UiComponentsPage(),
     _ph('설정', Icons.settings_rounded),
+  ];
+
+  static const List<String> _titles = [
+    '대시보드', '포트폴리오', '마켓', '거래', '분석', '백테스트', 'UI 컴포넌트', '설정',
   ];
 
   User? get _user {
@@ -133,7 +135,7 @@ class _AppShellState extends State<AppShell> {
         TextButton(
           style: TextButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
           onPressed: () {
-            final maxIdx = _pages.length - 1;
+            final maxIdx = _titles.length - 1;
             setState(() => _selectedIndex = _selectedIndex >= maxIdx ? 0 : _selectedIndex + 1);
           },
           child: Text('$_selectedIndex', style: TextStyle(fontSize: 11, color: cs.primary)),

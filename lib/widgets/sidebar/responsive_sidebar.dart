@@ -55,6 +55,11 @@ const List<_SidebarDestination> _destinations = [
     section: SidebarSection.tools,
   ),
   _SidebarDestination(
+    icon: Icons.palette_rounded,
+    label: 'UI 컴포넌트',
+    section: SidebarSection.account,
+  ),
+  _SidebarDestination(
     icon: Icons.settings_rounded,
     label: '설정',
     section: SidebarSection.account,

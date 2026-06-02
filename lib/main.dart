@@ -7,6 +7,7 @@ import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/counter/presentation/bloc/counter_bloc.dart';
 import 'features/kis_auth/data/repositories/kis_auth_repository.dart';
 import 'features/kis_auth/presentation/bloc/kis_auth_bloc.dart';
+import 'features/stock_search/presentation/bloc/stock_search_cubit.dart';
 
 import 'shared/api/api_client.dart';
 import 'shared/config/app_config.dart';
@@ -38,6 +39,7 @@ void main() {
         BlocProvider(
           create: (_) => KisAuthBloc(repository: kisAuthRepository),
         ),
+        BlocProvider(create: (_) => StockSearchCubit()),
       ],
       child: const BeyondiTradingApp(),
     ),

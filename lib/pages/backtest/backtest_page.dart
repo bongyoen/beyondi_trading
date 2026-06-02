@@ -10,6 +10,7 @@ import '../../../features/backtest/domain/usecases/run_backtest.dart';
 import '../../../features/kis_auth/presentation/bloc/kis_auth_bloc.dart';
 import '../../../features/kis_auth/presentation/bloc/kis_auth_state.dart';
 import '../../../shared/constants/app_constants.dart';
+import '../../../shared/widgets/stock_search_field.dart';
 
 class BacktestPage extends StatefulWidget {
   const BacktestPage({super.key});
@@ -181,6 +182,8 @@ class _BacktestPageState extends State<BacktestPage> {
       tickSize: ts,
       stopLossPercent: 5,
       closeAtEndOfDay: true,
+      mode: 'vwap_cross',
+      commissionPercent: 0.05,
     );
     _cache.saveResult(symbol: symbol, tickSize: ts, result: result);
     setState(() { _result = result; });
@@ -202,13 +205,17 @@ class _BacktestPageState extends State<BacktestPage> {
           const SizedBox(height: 16),
 
           _card(cs, children: [
+            StockSearchField(
+              onSelected: (stock) {
+                _symbolCtl.text = stock.code;
+                _cache.delete(symbol: stock.code, start: _startDate, end: _endDate, tickSize: double.tryParse(_tickCtl.text) ?? 100);
+                setState(() { _candles = null; _result = null; _status = '종목 변경: ${stock.display}'; });
+              },
+              initialCode: _symbolCtl.text,
+            ),
+            const SizedBox(height: 8),
             Row(children: [
-              Expanded(flex: 2, child: TextField(
-                controller: _symbolCtl,
-                decoration: const InputDecoration(labelText: '종목코드', hintText: '005930', border: OutlineInputBorder(), isDense: true),
-              )),
-              const SizedBox(width: 8),
-              Expanded(child: TextField(
+              SizedBox(width: 100, child: TextField(
                 controller: _tickCtl,
                 decoration: const InputDecoration(labelText: 'Tick Size', border: OutlineInputBorder(), isDense: true),
               )),
@@ -310,7 +317,11 @@ class _BacktestPageState extends State<BacktestPage> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(children: [
-        _rStat('총 손익', r.totalReturn.toStringAsFixed(0), r.totalReturn >= 0 ? Colors.green : Colors.red),
+        _rStat('순손익', r.netReturn.toStringAsFixed(0), r.netReturn >= 0 ? Colors.green : Colors.red),
+        const SizedBox(width: 20),
+        _rStat('수수료', r.totalCommission.toStringAsFixed(0), Colors.grey),
+        const SizedBox(width: 20),
+        _rStat('총손익', r.totalReturn.toStringAsFixed(0), r.totalReturn >= 0 ? Colors.green : Colors.red),
         const SizedBox(width: 20),
         _rStat('승률', '${(r.winRate * 100).toStringAsFixed(1)}%', r.winRate >= 0.5 ? Colors.green : Colors.red),
         const SizedBox(width: 20),

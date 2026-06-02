@@ -132,6 +132,8 @@ class CandleCache {
 
   Map<String, dynamic> _resultToJson(BacktestResult r) => {
         'totalReturn': r.totalReturn,
+        'totalCommission': r.totalCommission,
+        'netReturn': r.netReturn,
         'winRate': r.winRate,
         'totalSignals': r.totalSignals,
         'maxDrawdown': r.maxDrawdown,
@@ -141,6 +143,8 @@ class CandleCache {
 
   BacktestResult _resultFromJson(Map<String, dynamic> m) => BacktestResult(
         totalReturn: (m['totalReturn'] as num).toDouble(),
+        totalCommission: (m['totalCommission'] as num?)?.toDouble() ?? 0,
+        netReturn: (m['netReturn'] as num?)?.toDouble() ?? (m['totalReturn'] as num).toDouble(),
         winRate: (m['winRate'] as num).toDouble(),
         totalSignals: m['totalSignals'] as int,
         maxDrawdown: (m['maxDrawdown'] as num).toDouble(),

@@ -6,56 +6,53 @@ import '../entities/trade_record.dart';
 import '../entities/trade_signal.dart';
 import 'calculate_vwap.dart';
 
-/// VWAP + 거래량 프로파일 기반 백테스트 실행 유스케이스.
+  /// 백테스트 실행 유스케이스.
 ///
-/// 규칙:
-///   - 현재가 > VWAP && 현재가 > POC → 강한 매도 신호 (short 진입)
-///   - 현재가 < VWAP && 현재가 < POC → 강한 매수 신호 (long 진입)
-///   - 그 외 → 중립 (포지션 유지 또는 미진입)
-///   - [stopLossPercent] (기본 0 = 미사용): 손실 N% 도달 시 강제 청산
-///   - [closeAtEndOfDay]: true면 장 종료 시 포지션 청산
-///
-/// Atomic Predictability: 동일한 캔들 데이터 → 동일한 결과.
+/// [mode]: 'vwap_poc' (기본) = VWAP+POC 반전 전략
+///         'vwap_cross' = VWAP Cross 추세추종 (VWAP 위=Long, 아래=Short)
+/// [stopLossPercent]: 손실 N% 도달 시 강제 청산
+/// [closeAtEndOfDay]: 장 종료 시 포지션 청산
+/// [commissionPercent]: 거래당 수수료 (%)
 BacktestResult runBacktest({
   required List<Candle> candles,
   double tickSize = 1.0,
   double stopLossPercent = 0,
   bool closeAtEndOfDay = false,
+  String mode = 'vwap_poc',
+  double commissionPercent = 0,
 }) {
   if (candles.isEmpty) {
     return const BacktestResult(
-      trades: [],
-      totalReturn: 0,
-      winRate: 0,
-      totalSignals: 0,
-      maxDrawdown: 0,
-      sharpeRatio: 0,
+      trades: [], totalReturn: 0, totalCommission: 0, netReturn: 0,
+      winRate: 0, totalSignals: 0, maxDrawdown: 0, sharpeRatio: 0,
     );
   }
 
-  // 1. VWAP + POC 시리즈 미리 계산
   final vwapResult = calculateVwap(candles: candles, tickSize: tickSize);
 
-  // 2. 캔들 순회하며 신호 생성 및 포지션 트래킹
   final trades = <TradeRecord>[];
   TradeSignal? currentPosition;
   double? entryPrice;
   DateTime? entryTime;
+  double totalCommission = 0;
 
   void closePosition(double exitPrice, DateTime exitTime) {
     if (currentPosition == null || entryPrice == null || entryTime == null) return;
-    final pnl = _calculatePnl(
+    final rawPnl = _calculatePnl(
       signal: currentPosition!,
       entryPrice: entryPrice!,
       exitPrice: exitPrice,
     );
+    final commission = (entryPrice! + exitPrice) * (commissionPercent / 100);
+    final netPnl = rawPnl - commission;
+    totalCommission += commission;
     trades.add(TradeRecord(
       entryTime: entryTime!,
       exitTime: exitTime,
       entryPrice: entryPrice!,
       exitPrice: exitPrice,
       signal: currentPosition!,
-      pnl: pnl,
+      pnl: netPnl,
     ));
     currentPosition = null;
     entryPrice = null;
@@ -66,12 +63,14 @@ BacktestResult runBacktest({
     final candle = candles[i];
     final vwap = vwapResult.vwapSeries[i];
     final poc = vwapResult.pocSeries[i];
+
+    // End-of-day check
     final isLastOfDay = closeAtEndOfDay && (i + 1 >= candles.length ||
         candles[i + 1].timestamp.year != candle.timestamp.year ||
         candles[i + 1].timestamp.month != candle.timestamp.month ||
         candles[i + 1].timestamp.day != candle.timestamp.day);
 
-    // Stop Loss 체크
+    // Stop Loss
     if (currentPosition != null && stopLossPercent > 0) {
       final pnlPct = _calculatePnlPercent(
         signal: currentPosition!,
@@ -88,78 +87,67 @@ BacktestResult runBacktest({
       closePosition(candle.close, candle.timestamp);
     }
 
-    // 신호 결정
-    final signal = _determineSignal(
-      currentPrice: candle.close,
-      vwap: vwap,
-      poc: poc,
-    );
+    if (currentPosition != null) continue;
 
-    if (signal == TradeSignal.neutral) continue;
+    final rawSignal = mode == 'vwap_cross'
+        ? _vwapCrossSignal(currentPrice: candle.close, vwap: vwap)
+        : _vwapPocSignal(currentPrice: candle.close, vwap: vwap, poc: poc);
 
-    if (currentPosition == null) {
-      currentPosition = signal;
-      entryPrice = candle.close;
-      entryTime = candle.timestamp;
-    } else if (signal != currentPosition) {
-      closePosition(candle.close, candle.timestamp);
-      currentPosition = signal;
-      entryPrice = candle.close;
-      entryTime = candle.timestamp;
-    }
+    if (rawSignal == TradeSignal.neutral) continue;
+
+    currentPosition = rawSignal;
+    entryPrice = candle.close;
+    entryTime = candle.timestamp;
   }
 
-  // 3. 마지막 포지션 청산 (마지막 캔들 종가 기준)
+  // 마지막 포지션 청산
   if (currentPosition != null && entryPrice != null && entryTime != null) {
-    final lastCandle = candles.last;
-    final pnl = _calculatePnl(
+    final last = candles.last;
+    final rawPnl = _calculatePnl(
       signal: currentPosition!,
       entryPrice: entryPrice!,
-      exitPrice: lastCandle.close,
+      exitPrice: last.close,
     );
-
+    final commission = (entryPrice! + last.close) * (commissionPercent / 100);
+    totalCommission += commission;
     trades.add(TradeRecord(
       entryTime: entryTime!,
-      exitTime: lastCandle.timestamp,
+      exitTime: last.timestamp,
       entryPrice: entryPrice!,
-      exitPrice: lastCandle.close,
+      exitPrice: last.close,
       signal: currentPosition!,
-      pnl: pnl,
+      pnl: rawPnl - commission,
     ));
   }
 
-  // 4. 통계 계산
-  final totalReturn = trades.fold(0.0, (sum, t) => sum + t.pnl);
+  final totalReturn = trades.fold(0.0, (s, t) => s + t.pnl);
   final wins = trades.where((t) => t.pnl > 0).length;
   final winRate = trades.isEmpty ? 0.0 : wins / trades.length;
 
-  // Max Drawdown
   double peak = 0;
   double maxDrawdown = 0;
   double runningPnl = 0;
-  for (final trade in trades) {
-    runningPnl += trade.pnl;
+  for (final t in trades) {
+    runningPnl += t.pnl;
     if (runningPnl > peak) peak = runningPnl;
-    final drawdown = peak - runningPnl;
-    if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+    final dd = peak - runningPnl;
+    if (dd > maxDrawdown) maxDrawdown = dd;
   }
 
-  // Sharpe Ratio (단순화: 평균 수익률 / 표준편차)
   double sharpeRatio = 0;
   if (trades.length > 1) {
     final returns = trades.map((t) => t.pnl).toList();
-    final avgReturn = returns.reduce((a, b) => a + b) / returns.length;
-    final variance = returns
-            .map((r) => (r - avgReturn) * (r - avgReturn))
-            .reduce((a, b) => a + b) /
-        returns.length;
+    final avg = returns.reduce((a, b) => a + b) / returns.length;
+    final variance = returns.map((r) => (r - avg) * (r - avg)).reduce((a, b) => a + b) / returns.length;
     final stdDev = sqrt(variance);
-    sharpeRatio = stdDev == 0 ? 0 : avgReturn / stdDev;
+    sharpeRatio = stdDev == 0 ? 0 : avg / stdDev;
   }
 
   return BacktestResult(
     trades: trades,
-    totalReturn: totalReturn,
+    totalReturn: totalReturn + totalCommission,
+    totalCommission: totalCommission,
+    netReturn: totalReturn,
     winRate: winRate,
     totalSignals: trades.length,
     maxDrawdown: maxDrawdown,
@@ -167,31 +155,30 @@ BacktestResult runBacktest({
   );
 }
 
-/// VWAP + POC 기반 매매 신호 판단.
-///
-/// - 현재가 > VWAP && 현재가 > POC → strongSell
-/// - 현재가 < VWAP && 현재가 < POC → strongBuy
-/// - 그 외 → neutral
-TradeSignal _determineSignal({
+/// VWAP+POC 반전 전략: VWAP/POC 둘 다 위=Short, 둘 다 아래=Long
+TradeSignal _vwapPocSignal({
   required double currentPrice,
   required double vwap,
   double? poc,
 }) {
   if (poc == null) return TradeSignal.neutral;
-
   final aboveVwap = currentPrice > vwap;
   final abovePoc = currentPrice > poc;
-
   if (aboveVwap && abovePoc) return TradeSignal.strongSell;
   if (!aboveVwap && !abovePoc) return TradeSignal.strongBuy;
-
   return TradeSignal.neutral;
 }
 
-/// 포지션 방향에 따른 손익 계산.
-///
-/// - strongBuy (long):  exitPrice - entryPrice
-/// - strongSell (short): entryPrice - exitPrice
+/// VWAP Cross 추세추종: VWAP 위=Long, 아래=Short
+TradeSignal _vwapCrossSignal({
+  required double currentPrice,
+  required double vwap,
+}) {
+  if (currentPrice > vwap) return TradeSignal.strongBuy;
+  if (currentPrice < vwap) return TradeSignal.strongSell;
+  return TradeSignal.neutral;
+}
+
 double _calculatePnl({
   required TradeSignal signal,
   required double entryPrice,
@@ -202,7 +189,6 @@ double _calculatePnl({
       : entryPrice - exitPrice;
 }
 
-/// 포지션 방향에 따른 손익률(%) 계산.
 double _calculatePnlPercent({
   required TradeSignal signal,
   required double entryPrice,
