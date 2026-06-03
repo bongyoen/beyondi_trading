@@ -14,11 +14,26 @@ void main(List<String> args) async {
   final cacheDir = '${Platform.environment['APPDATA'] ?? ''}\\com.example\\beyondi_trading';
   final limited = args.contains('--quick');
 
-  print('KIS API: $baseUrl (isPaper=$isPaper)');
-  final token = await _getToken(appKey, appSecret, baseUrl);
-  print('토큰 발급 완료\n');
+  // --stock 옵션으로 단일 종목 테스트
+  String? singleCode;
+  for (int i = 0; i < args.length; i++) {
+    if (args[i] == '--stock' && i + 1 < args.length) singleCode = args[i + 1];
+    if (args[i].startsWith('--stock=')) singleCode = args[i].substring(8);
+  }
 
-  final stocks = [
+  print('KIS API: $baseUrl (isPaper=$isPaper)');
+  final tokenFile = File('$cacheDir\\kis_token.txt');
+  var token = tokenFile.existsSync() ? tokenFile.readAsStringSync().trim() : '';
+  if (token.isEmpty) {
+    token = await _getToken(appKey, appSecret, baseUrl);
+    if (token.isEmpty) { print('토큰 발급 실패'); exit(1); }
+    tokenFile.writeAsStringSync(token);
+    print('새 토큰 발급 완료');
+  } else {
+    print('캐싱된 토큰 사용');
+  }
+
+  final allStocks = [
     {'code': '002790', 'name': '아모레G'},
     {'code': '207940', 'name': '삼성바이오로직스'},
     {'code': '090430', 'name': '아모레퍼시픽'},
@@ -34,7 +49,11 @@ void main(List<String> args) async {
     {'code': '005380', 'name': '현대차'},
     {'code': '005930', 'name': '삼성전자'},
     {'code': '000660', 'name': 'SK하이닉스'},
+    {'code': '005490', 'name': 'POSCO홀딩스'},
   ];
+  final stocks = singleCode != null
+      ? allStocks.where((s) => s['code'] == singleCode).toList()
+      : allStocks;
 
   final allResults = <Map<String, dynamic>>[];
   final endDate = DateTime.now();
@@ -122,12 +141,11 @@ Future<String> _getToken(String key, String secret, String baseUrl) async {
     final res = await r.close();
     final body = await res.transform(utf8.decoder).join();
     final json = jsonDecode(body) as Map<String, dynamic>;
-    final token = json['access_token'] as String?;
-    if (token == null || token.isEmpty) {
-      print('토큰 발급 실패: $body');
-      exit(1);
+    if (json['access_token'] == null) {
+      print('토큰 발급 실패: ${json['msg1'] ?? json['error_description'] ?? body}');
+      return '';
     }
-    return token;
+    return json['access_token'] as String;
   } finally { c.close(); }
 }
 

@@ -14,21 +14,37 @@ void main(List<String> args) async {
   final isPaper = appKey.startsWith('PS') ? true : ((config['is_paper'] as bool?) ?? true);
   final baseUrl = isPaper ? 'https://openapivts.koreainvestment.com:29443' : 'https://openapi.koreainvestment.com:9443';
 
-  String? singleCode;
-  for (int i = 0; i < args.length - 1; i++) {
-    if (args[i] == '--code') singleCode = args[i + 1];
+  final codes = <String>[];
+  for (int i = 0; i < args.length; i++) {
+    if (args[i] == '--code' && i + 1 < args.length) codes.add(args[i + 1]);
+    if (args[i].startsWith('--code=')) codes.add(args[i].substring(7));
   }
   final testAll = args.contains('--all');
 
-  final stocks = testAll ? [
+  final knownList = [
     '005930', '000660', '005380', '012330', '097950',
     '207940', '373220', '068270', '018260', '105560',
     '000270', '003490', '002790', '055550', '090430',
-  ] : (singleCode != null ? [singleCode] : ['005930']);
+  ];
+  final stocks = testAll ? knownList : (codes.isNotEmpty ? codes : ['005930']);
 
   print('KIS: ${isPaper ? "모의" : "실전"} ($baseUrl)');
-  final token = await _getToken(appKey, appSecret, baseUrl);
-  if (token.isEmpty) { print('토큰 발급 실패'); exit(1); }
+
+  // 캐싱된 토큰 재사용 (1분 1회 제한 대응)
+  final tokenFile = File('${Platform.environment['APPDATA'] ?? ''}\\com.example\\beyondi_trading\\kis_token.txt');
+  String? token;
+  if (tokenFile.existsSync()) {
+    final saved = tokenFile.readAsStringSync().trim();
+    if (saved.isNotEmpty) token = saved;
+  }
+  if (token == null) {
+    token = await _getToken(appKey, appSecret, baseUrl);
+    if (token.isEmpty) { print('토큰 발급 실패. 1분 후 재시도'); exit(1); }
+    tokenFile.writeAsStringSync(token);
+    print('새 토큰 발급 완료');
+  } else {
+    print('캐싱된 토큰 사용');
+  }
   print('테스트: ${stocks.length}개 종목\n');
 
   final allResults = <Map<String, dynamic>>[];
