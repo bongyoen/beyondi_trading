@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../shared/theme/font_helper.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../entities/user.dart';
@@ -104,7 +104,7 @@ class _KisStatusBadgeState extends State<KisStatusBadge> {
             const SizedBox(width: 4),
             Text(
               label,
-              style: GoogleFonts.inter(
+              style: inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: color,
@@ -120,7 +120,7 @@ class _KisStatusBadgeState extends State<KisStatusBadge> {
               const SizedBox(width: 4),
               Text(
                 subtitle,
-                style: GoogleFonts.inter(
+                style: inter(
                   fontSize: 10,
                   color: color.withValues(alpha: 0.8),
                 ),
@@ -133,105 +133,95 @@ class _KisStatusBadgeState extends State<KisStatusBadge> {
   }
 
   void _showConnectDialog(BuildContext context) {
-    final appKeyController = TextEditingController();
-    final appSecretController = TextEditingController();
-    bool hideSecret = true;
-    // 설정 파일에서 기존 키 로드 (isPaper 기본값: false=실전)
-    bool isPaper = false;
-    _loadKisConfig().then((cfg) {
-      if (cfg != null) {
-        appKeyController.text = cfg.$1;
-        appSecretController.text = cfg.$2;
-        isPaper = cfg.$3;
-      }
-    });
+    final mockKeyCtl = TextEditingController();
+    final mockSecretCtl = TextEditingController();
+    final mockAcctCtl = TextEditingController();
+    final realKeyCtl = TextEditingController();
+    final realSecretCtl = TextEditingController();
+    final realAcctCtl = TextEditingController();
+    bool showMockSecret = true;
+    bool showRealSecret = true;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('KIS API 연결'),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '한국투자증권 Open API 키를 입력하세요.\n'
-                  '설정 파일(%LOCALAPPDATA%\\beyondi_trading\\kis_config.json)에서'
-                  ' 자동 로드됩니다.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: appKeyController,
-                  decoration: const InputDecoration(
-                    labelText: '앱키 (App Key)',
-                    border: OutlineInputBorder(),
-                  ),
-                  enableInteractiveSelection: true,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: appSecretController,
-                  decoration: InputDecoration(
-                    labelText: '앱시크릿 (App Secret)',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        hideSecret
-                            ? Icons.visibility_rounded
-                            : Icons.visibility_off_rounded,
-                        size: 20,
-                      ),
-                      tooltip: hideSecret ? '표시' : '숨기기',
-                      onPressed: () =>
-                          setDialogState(() => hideSecret = !hideSecret),
-                    ),
-                  ),
-                  obscureText: hideSecret,
-                  enableInteractiveSelection: true,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text('모의투자'),
-                    Switch(
-                      value: isPaper,
-                      onChanged: (v) => setDialogState(() => isPaper = v),
-                    ),
-                  ],
-                ),
-              ],
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Text('KIS API 연결'),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('모의/실전 중 최소 하나는 입력해야 합니다. 둘 다 입력 가능합니다.',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  const SizedBox(height: 12),
+                  _envBox('모의계좌', Colors.blue, mockKeyCtl, mockSecretCtl, mockAcctCtl, showMockSecret, (v) => setDialogState(() => showMockSecret = v)),
+                  const SizedBox(height: 10),
+                  _envBox('실전계좌', Colors.green, realKeyCtl, realSecretCtl, realAcctCtl, showRealSecret, (v) => setDialogState(() => showRealSecret = v)),
+                ]),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+              FilledButton(onPressed: () {
+                final mk = mockKeyCtl.text.trim();
+                final ms = mockSecretCtl.text.trim();
+                final rk = realKeyCtl.text.trim();
+                final rs = realSecretCtl.text.trim();
+                if (mk.isEmpty && ms.isEmpty && rk.isEmpty && rs.isEmpty) return;
+                if ((mk.isNotEmpty && ms.isEmpty) || (rk.isNotEmpty && rs.isEmpty)) return;
+                final mockAcct = mockAcctCtl.text.trim();
+                final realAcct = realAcctCtl.text.trim();
+                Navigator.pop(ctx);
+                context.read<KisAuthBloc>().add(KisConnectRequested(
+                  userId: widget.user.id,
+                  mockKey: mk.isNotEmpty ? mk : null,
+                  mockSecret: ms.isNotEmpty ? ms : null,
+                  mockAccountNo: mockAcct.isNotEmpty ? mockAcct : null,
+                  realKey: rk.isNotEmpty ? rk : null,
+                  realSecret: rs.isNotEmpty ? rs : null,
+                  realAccountNo: realAcct.isNotEmpty ? realAcct : null,
+                ));
+              }, child: const Text('연결')),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _envBox(String title, Color color,
+      TextEditingController keyCtl, TextEditingController secretCtl,
+      TextEditingController acctCtl, bool hideSecret, void Function(bool) setHide) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: inter(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+        const SizedBox(height: 8),
+        TextField(controller: keyCtl, decoration: const InputDecoration(labelText: '앱키', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: secretCtl,
+          decoration: InputDecoration(
+            labelText: '앱시크릿', border: const OutlineInputBorder(), isDense: true,
+            suffixIcon: IconButton(
+              icon: Icon(hideSecret ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 18),
+              onPressed: () => setHide(!hideSecret),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final key = appKeyController.text.trim();
-                final secret = appSecretController.text.trim();
-                if (key.isEmpty || secret.isEmpty) return;
-                _saveKisConfig(key, secret, isPaper);
-                Navigator.pop(ctx);
-                context.read<KisAuthBloc>().add(
-                  KisConnectRequested(
-                    appKey: key,
-                    appSecret: secret,
-                    userId: widget.user.id,
-                    isPaper: isPaper,
-                  ),
-                );
-              },
-              child: const Text('연결'),
-            ),
-          ],
+          obscureText: hideSecret,
         ),
-      ),
+        const SizedBox(height: 6),
+        Row(children: [
+          Expanded(flex: 3, child: TextField(controller: acctCtl, decoration: const InputDecoration(labelText: '계좌번호 8자리', border: OutlineInputBorder(), isDense: true), maxLength: 8)),
+          const SizedBox(width: 6),
+          Expanded(child: TextField(decoration: const InputDecoration(labelText: '상품코드', hintText: '01', border: OutlineInputBorder(), isDense: true), maxLength: 2)),
+        ]),
+      ]),
     );
   }
 
@@ -306,77 +296,116 @@ class _KisStatusBadgeState extends State<KisStatusBadge> {
   void _showConnectionInfo(BuildContext context, KisConnection conn) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('KIS API 연결 정보'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _infoRow('환경', conn.isPaper ? '모의투자' : '실전투자'),
-            _infoRow('앱키', conn.maskedKey),
-            _infoRow(
-              '연결 시간',
-              conn.connectedAt.toLocal().toString().substring(0, 19),
-            ),
-            _infoRow(
-              '토큰 만료',
-              conn.tokenExpiry?.toLocal().toString().substring(0, 19) ?? '-',
-            ),
-            if (conn.accessToken != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(children: [
-                  const SizedBox(width: 80, child: Text('액세스 토큰', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: conn.accessToken!));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('토큰이 클립보드에 복사되었습니다'), duration: Duration(seconds: 2)),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Expanded(
-                            child: Text(
-                              '${conn.accessToken!.substring(0, 20)}...',
-                              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                              overflow: TextOverflow.ellipsis,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final currentConn = (context.read<KisAuthBloc>().state is KisAuthConnected)
+              ? (context.read<KisAuthBloc>().state as KisAuthConnected).connection
+              : conn;
+          return AlertDialog(
+            title: const Text('KIS API 연결 정보'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (currentConn.mock != null && currentConn.real != null) ...[
+                  Row(children: [
+                    const Text('환경 전환', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(width: 12),
+                    _envChip('모의', Colors.blue, !currentConn.useMock, () {
+                      context.read<KisAuthBloc>().add(const KisToggleEnv(true));
+                      setDialogState(() {});
+                    }),
+                    const SizedBox(width: 6),
+                    _envChip('실전', Colors.green, currentConn.useMock, () {
+                      context.read<KisAuthBloc>().add(const KisToggleEnv(false));
+                      setDialogState(() {});
+                    }),
+                  ]),
+                  const SizedBox(height: 8),
+                ],
+                _infoRow('환경', currentConn.envLabel),
+                _infoRow('앱키', currentConn.maskedKey),
+                _infoRow('연결 시간', currentConn.active?.connectedAt.toLocal().toString().substring(0, 19) ?? '-'),
+                _infoRow('토큰 만료', currentConn.active?.tokenExpiry?.toLocal().toString().substring(0, 19) ?? '-'),
+                if (currentConn.active?.accessToken != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(children: [
+                      const SizedBox(width: 80, child: Text('액세스 토큰', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: currentConn.active!.accessToken!));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('토큰이 클립보드에 복사되었습니다'), duration: Duration(seconds: 2)),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
                             ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Expanded(
+                                child: Text(
+                                  '${currentConn.active!.accessToken!.substring(0, 20)}...',
+                                  style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.copy_rounded, size: 14),
+                            ]),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.copy_rounded, size: 14),
-                        ]),
+                        ),
                       ),
-                    ),
+                    ]),
                   ),
-                ]),
+                _infoRow('남은 시간', currentConn.expiryRemaining),
+                _infoRow('상태', currentConn.isTokenValid ? '유효' : '만료'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  context.read<KisAuthBloc>().add(
+                    KisDisconnectRequested(userId: widget.user.id),
+                  );
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('연결 해제'),
               ),
-            _infoRow('남은 시간', conn.expiryRemaining),
-            _infoRow('상태', conn.isTokenValid ? '유효' : '만료'),
-          ],
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('닫기'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _envChip(String label, Color color, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: selected ? color : color.withValues(alpha: 0.3)),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<KisAuthBloc>().add(
-                KisDisconnectRequested(userId: widget.user.id),
-              );
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('연결 해제'),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? color : color.withValues(alpha: 0.6),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-        ],
+        ),
       ),
     );
   }

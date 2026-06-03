@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/theme/font_helper.dart';
 
 import '../../../entities/user.dart';
 import '../../../features/auth/presentation/bloc/login_state.dart';
@@ -27,9 +27,9 @@ class _AppShellState extends State<AppShell> {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 64, color: Colors.grey.withValues(alpha: 0.3)),
         const SizedBox(height: 16),
-        Text(title, style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.grey.withValues(alpha: 0.5))),
+        Text(title, style: poppins(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.grey.withValues(alpha: 0.5))),
         const SizedBox(height: 4),
-        Text('준비 중', style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.withValues(alpha: 0.4))),
+        Text('준비 중', style: inter(fontSize: 14, color: Colors.grey.withValues(alpha: 0.4))),
       ]),
     );
   }
@@ -130,7 +130,7 @@ class _AppShellState extends State<AppShell> {
         border: Border(bottom: BorderSide(color: cs.outline.withValues(alpha: 0.1))),
       ),
       child: Row(children: [
-        Text('Beyondi Trading', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+        Text('Beyondi Trading', style: poppins(fontSize: 16, fontWeight: FontWeight.w700)),
         SizedBox(width: 12),
         TextButton(
           style: TextButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
@@ -141,7 +141,7 @@ class _AppShellState extends State<AppShell> {
           child: Text('$_selectedIndex', style: TextStyle(fontSize: 11, color: cs.primary)),
         ),
         Spacer(),
-        Text('$name 님', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+        Text('$name 님', style: inter(fontSize: 13, color: cs.onSurfaceVariant)),
         SizedBox(width: 8),
         _kis(),
         SizedBox(width: 4),

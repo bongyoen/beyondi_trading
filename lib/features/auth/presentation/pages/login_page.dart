@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../shared/theme/font_helper.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../shared/constants/app_constants.dart';
@@ -197,7 +197,7 @@ class _LoginPageState extends State<LoginPage>
         const SizedBox(height: AppConstants.spacingMd),
         Text(
           'Beyondi Trading',
-          style: GoogleFonts.poppins(
+          style: poppins(
             fontSize: 28,
             fontWeight: FontWeight.w700,
             color: Theme.of(context).colorScheme.onSurface,
@@ -207,7 +207,7 @@ class _LoginPageState extends State<LoginPage>
         const SizedBox(height: AppConstants.spacingXs),
         Text(
           '로그인하여 계속하세요',
-          style: GoogleFonts.inter(
+          style: inter(
             fontSize: 14,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -298,7 +298,7 @@ class _LoginPageState extends State<LoginPage>
         const SizedBox(width: AppConstants.spacingXs),
         Text(
           '아이디 저장',
-          style: GoogleFonts.inter(
+          style: inter(
             fontSize: 14,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -356,7 +356,7 @@ class _LoginPageState extends State<LoginPage>
                         children: [
                           Text(
                             '로그인',
-                            style: GoogleFonts.poppins(
+                            style: poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -395,7 +395,7 @@ class _LoginPageState extends State<LoginPage>
                 Expanded(
                   child: Text(
                     state.message,
-                    style: GoogleFonts.inter(
+                    style: inter(
                       fontSize: 13,
                       color: Theme.of(context).colorScheme.error,
                       fontWeight: FontWeight.w500,
@@ -411,7 +411,7 @@ class _LoginPageState extends State<LoginPage>
         return Text(
           '데모: 모든 아이디와 비밀번호로 로그인 가능',
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
+          style: inter(
             fontSize: 12,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontStyle: FontStyle.italic,

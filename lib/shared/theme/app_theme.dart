@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'font_helper.dart';
 
 /// Bold, intentional theme following the 5 Pillars of Intentional UI.
 ///
@@ -10,54 +10,47 @@ class AppTheme {
   const AppTheme._();
 
   // ── Light Palette ──
-  static const Color _primaryLight = Color(0xFF1E3A5F);
+  static const Color _primaryLight = Color(0xFF5596ED);
   static const Color _onPrimaryLight = Color(0xFFFFFFFF);
-  static const Color _primaryContainerLight = Color(0xFFD4E4FF);
-  static const Color _onPrimaryContainerLight = Color(0xFF001D36);
+  static const Color _primaryContainerLight = Color(0xFF003494);
+  static const Color _onPrimaryContainerLight = Color(0xFFB8D4FF);
 
-  static const Color _secondaryLight = Color(0xFFB8860B);
+  static const Color _secondaryLight = Color(0xFF074FA0);
   static const Color _onSecondaryLight = Color(0xFFFFFFFF);
-  static const Color _secondaryContainerLight = Color(0xFFFFDE9A);
-  static const Color _onSecondaryContainerLight = Color(0xFF2A1F00);
+  static const Color _secondaryContainerLight = Color(0xFFB8D4FF);
+  static const Color _onSecondaryContainerLight = Color(0xFF001D36);
 
-  static const Color _tertiaryLight = Color(0xFF006B5E);
+  static const Color _tertiaryLight = Color(0xFF5C7494);
   static const Color _surfaceLight = Color(0xFFF8F9FF);
   static const Color _surfaceVariantLight = Color(0xFFE0E2EC);
   static const Color _errorLight = Color(0xFFBA1A1A);
 
   // ── Dark Palette ──
-  static const Color _primaryDark = Color(0xFF9ECAFF);
+  static const Color _primaryDark = Color(0xFF9EC5FF);
   static const Color _onPrimaryDark = Color(0xFF003258);
-  static const Color _primaryContainerDark = Color(0xFF004A7C);
-  static const Color _onPrimaryContainerDark = Color(0xFFD4E4FF);
+  static const Color _primaryContainerDark = Color(0xFF003494);
+  static const Color _onPrimaryContainerDark = Color(0xFFB8D4FF);
 
-  static const Color _secondaryDark = Color(0xFFF5C542);
-  static const Color _onSecondaryDark = Color(0xFF3A2E00);
-  static const Color _secondaryContainerDark = Color(0xFF544300);
-  static const Color _onSecondaryContainerDark = Color(0xFFFFDE9A);
+  static const Color _secondaryDark = Color(0xFF6EA8F0);
+  static const Color _onSecondaryDark = Color(0xFF003064);
+  static const Color _secondaryContainerDark = Color(0xFF003C7A);
+  static const Color _onSecondaryContainerDark = Color(0xFFB8D4FF);
 
-  static const Color _tertiaryDark = Color(0xFF5BD9C6);
+  static const Color _tertiaryDark = Color(0xFF9CB4D4);
   static const Color _surfaceDark = Color(0xFF111318);
   static const Color _surfaceVariantDark = Color(0xFF42474E);
   static const Color _errorDark = Color(0xFFFFB4AB);
 
   // ── Surface Gradients (for depth) ──
-  static const LinearGradient sidebarGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFF1A1A2E),
-      Color(0xFF16213E),
-    ],
-  );
+  static const Color sidebarColor = Color(0xFF074FA0);
 
   static const LinearGradient loginGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF0F0C29),
-      Color(0xFF1E3A5F),
-      Color(0xFF2C1654),
+      Color(0xFF003C7A),
+      Color(0xFF074FA0),
+      Color(0xFF5596ED),
     ],
   );
 
@@ -65,8 +58,8 @@ class AppTheme {
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
     colors: [
-      Color(0xFFB8860B),
-      Color(0xFFD4A017),
+      Color(0xFF5596ED),
+      Color(0xFF7DB5F5),
     ],
   );
 
@@ -122,47 +115,22 @@ class AppTheme {
       outline: isDark ? const Color(0xFF8E9099) : const Color(0xFF74777F),
     );
 
-    // Typography: Distinctive fonts (Pillar 1)
-    final TextTheme interTextTheme = GoogleFonts.interTextTheme(
-      isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
-    );
-
-    final TextTheme poppinsTextTheme = GoogleFonts.poppinsTextTheme(
-      isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
-    );
-
-    final TextTheme mergedTextTheme = interTextTheme.copyWith(
-      displayLarge: poppinsTextTheme.displayLarge?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-      displayMedium: poppinsTextTheme.displayMedium?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-      displaySmall: poppinsTextTheme.displaySmall?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      headlineLarge: poppinsTextTheme.headlineLarge?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      headlineMedium: poppinsTextTheme.headlineMedium?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      headlineSmall: poppinsTextTheme.headlineSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      titleLarge: poppinsTextTheme.titleLarge?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      titleMedium: poppinsTextTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      titleSmall: poppinsTextTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      labelLarge: poppinsTextTheme.labelLarge,
-      labelMedium: poppinsTextTheme.labelMedium,
-      labelSmall: poppinsTextTheme.labelSmall,
-    );
+    // Typography: Inter body, Poppins headings
+    final base = isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
+    final TextTheme mergedTextTheme = base.copyWith(
+      displayLarge: base.displayLarge?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w700, decoration: TextDecoration.none),
+      displayMedium: base.displayMedium?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w700, decoration: TextDecoration.none),
+      displaySmall: base.displaySmall?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w600, decoration: TextDecoration.none),
+      headlineLarge: base.headlineLarge?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w600, decoration: TextDecoration.none),
+      headlineMedium: base.headlineMedium?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w600, decoration: TextDecoration.none),
+      headlineSmall: base.headlineSmall?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w600, decoration: TextDecoration.none),
+      titleLarge: base.titleLarge?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w600, decoration: TextDecoration.none),
+      titleMedium: base.titleMedium?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w600, decoration: TextDecoration.none),
+      titleSmall: base.titleSmall?.copyWith(fontFamily: 'Poppins', fontWeight: FontWeight.w600, decoration: TextDecoration.none),
+      labelLarge: base.labelLarge?.copyWith(decoration: TextDecoration.none),
+      labelMedium: base.labelMedium?.copyWith(decoration: TextDecoration.none),
+      labelSmall: base.labelSmall?.copyWith(decoration: TextDecoration.none),
+    ).apply(fontFamily: 'Inter', decoration: TextDecoration.none);
 
     return ThemeData(
       useMaterial3: true,
@@ -178,7 +146,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.poppins(
+        titleTextStyle: poppins(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: colorScheme.onSurface,
@@ -233,11 +201,11 @@ class AppTheme {
           horizontal: 16,
           vertical: 16,
         ),
-        hintStyle: GoogleFonts.inter(
+        hintStyle: inter(
           color: colorScheme.onSurfaceVariant,
           fontSize: 14,
         ),
-        labelStyle: GoogleFonts.inter(
+        labelStyle: inter(
           color: colorScheme.onSurfaceVariant,
           fontSize: 14,
         ),
@@ -254,7 +222,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.poppins(
+          textStyle: poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -268,13 +236,13 @@ class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith(
           (Set<WidgetState> states) {
             if (states.contains(WidgetState.selected)) {
-              return GoogleFonts.inter(
+              return inter(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: colorScheme.onSurface,
               );
             }
-            return GoogleFonts.inter(
+            return inter(
               fontSize: 12,
               fontWeight: FontWeight.w400,
               color: colorScheme.onSurfaceVariant,

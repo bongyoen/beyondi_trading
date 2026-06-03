@@ -5,21 +5,20 @@ import 'package:http/http.dart' as http;
 import '../../../backtest/data/datasources/kis_stock_api.dart';
 import '../../domain/entities/kis_connection.dart';
 
-/// KIS 연결 정보 저장/조회 추상 계약.
 abstract class KisAuthRepository {
   Future<KisConnection> connect({
-    required String appKey,
-    required String appSecret,
     required String userId,
-    bool isPaper = true,
+    String? mockKey, String? mockSecret,
+    String? mockAccountNo, String? mockProductCode,
+    String? realKey, String? realSecret,
+    String? realAccountNo, String? realProductCode,
   });
 
   Future<KisConnection?> getConnection(String userId);
-
-  Future<void> disconnect(String userId);
+  Future<void> disconnect(String userId, {String? envType});
+  Future<void> toggleEnv(String userId, bool useMock);
 }
 
-/// Cloudflare Workers API 기반 KIS 인증 저장소.
 class WorkersKisAuthRepository implements KisAuthRepository {
   WorkersKisAuthRepository({required this.apiBaseUrl, http.Client? client})
       : _client = client ?? http.Client();
@@ -27,125 +26,111 @@ class WorkersKisAuthRepository implements KisAuthRepository {
   final String apiBaseUrl;
   final http.Client _client;
 
-  @override
-  Future<KisConnection> connect({
+  Future<KisCredentials?> _connectEnv({
+    required String userId,
+    required String envType,
     required String appKey,
     required String appSecret,
-    required String userId,
-    bool isPaper = true,
+    String? accountNo,
+    String? productCode,
   }) async {
-    final kisApi = KisStockApi(
-      appKey: appKey,
-      appSecret: appSecret,
-      isPaper: isPaper,
-      client: _client,
-    );
+    final kisApi = KisStockApi(appKey: appKey, appSecret: appSecret, isPaper: envType == 'mock');
 
     final token = await kisApi.getToken();
+    final expiry = kisApi.tokenExpiry;
+    final now = DateTime.now();
+    final normAcct = (accountNo?.isNotEmpty == true) ? accountNo : null;
+    final normProd = (productCode?.isNotEmpty == true) ? productCode : null;
 
     final uri = Uri.parse('$apiBaseUrl/kis/auth');
-    final response = await _client.post(
-      uri,
-      headers: _jsonHeaders,
-      body: jsonEncode({
-        'user_id': userId,
-        'app_key': appKey,
-        'app_secret': appSecret,
-        'access_token': token,
-        'token_expiry': kisApi.tokenExpiry?.toIso8601String(),
-        'is_paper': isPaper,
-      }),
-    );
+    await _client.post(uri, headers: _jsonHeaders, body: jsonEncode({
+      'user_id': userId, 'env_type': envType,
+      'app_key': appKey, 'app_secret': appSecret,
+      'access_token': token, 'token_expiry': expiry?.toIso8601String(),
+      'account_no': normAcct, 'product_code': normProd,
+    }));
 
-    final saved = _parseSaveResponse(response.body, response.statusCode);
-
-    return KisConnection(
-      appKey: appKey,
-      appSecret: appSecret,
-      accessToken: token,
-      tokenExpiry: kisApi.tokenExpiry,
-      isPaper: isPaper,
-      connectedAt: saved,
+    return KisCredentials(
+      appKey: appKey, appSecret: appSecret,
+      accountNo: normAcct, productCode: normProd,
+      accessToken: token, tokenExpiry: expiry,
+      connectedAt: now,
     );
   }
 
-  DateTime _parseSaveResponse(String body, int statusCode) {
-    if (body.isEmpty) {
-      throw KisApiException(
-        'KIS 연결 정보 저장 실패: 응답 본문이 비어 있습니다 (HTTP $statusCode).',
+  @override
+  Future<KisConnection> connect({
+    required String userId,
+    String? mockKey, String? mockSecret,
+    String? mockAccountNo, String? mockProductCode,
+    String? realKey, String? realSecret,
+    String? realAccountNo, String? realProductCode,
+  }) async {
+    KisCredentials? mock, real;
+
+    if (mockKey != null && mockSecret != null) {
+      mock = await _connectEnv(
+        userId: userId, envType: 'mock',
+        appKey: mockKey, appSecret: mockSecret,
+        accountNo: mockAccountNo, productCode: mockProductCode,
+      );
+    }
+    if (realKey != null && realSecret != null) {
+      real = await _connectEnv(
+        userId: userId, envType: 'real',
+        appKey: realKey, appSecret: realSecret,
+        accountNo: realAccountNo, productCode: realProductCode,
       );
     }
 
-    final Map<String, dynamic> json;
-    try {
-      json = jsonDecode(body) as Map<String, dynamic>;
-    } catch (e) {
-      throw KisApiException(
-        'KIS 연결 정보 저장 실패: JSON 파싱 오류 ($e)\nbody=$body',
-      );
-    }
-
-    if (statusCode != 200) {
-      throw KisApiException(
-        'KIS 연결 정보 저장 실패 (HTTP $statusCode): '
-        '${json['error'] ?? body}',
-      );
-    }
-
-    final raw = json['connected_at'];
-    if (raw is! String || raw.isEmpty) {
-      throw KisApiException(
-        'KIS 연결 정보 저장 실패: connected_at이 응답에 없습니다.\n'
-        'body=$body',
-      );
-    }
-
-    return DateTime.parse(raw);
+    return KisConnection(
+      mock: mock,
+      real: real,
+      useMock: real == null && mock != null,
+    );
   }
 
   @override
   Future<KisConnection?> getConnection(String userId) async {
     final uri = Uri.parse('$apiBaseUrl/kis/auth?user_id=$userId');
     final response = await _client.get(uri, headers: _jsonHeaders);
-
     if (response.statusCode != 200 || response.body.isEmpty) return null;
 
-    final Map<String, dynamic> body;
-    try {
-      body = jsonDecode(response.body) as Map<String, dynamic>;
-    } catch (_) {
-      return null;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    KisCredentials? _parse(String key) {
+      final d = body[key];
+      if (d == null || d is! Map) return null;
+      String? nz(String? v) => (v?.isNotEmpty == true) ? v : null;
+      return KisCredentials(
+        appKey: d['app_key'] as String? ?? '',
+        appSecret: d['app_secret'] as String? ?? '',
+        accountNo: nz(d['account_no'] as String?),
+        productCode: nz(d['product_code'] as String?),
+        accessToken: nz(d['access_token'] as String?),
+        tokenExpiry: d['token_expiry'] != null ? DateTime.tryParse(d['token_expiry'] as String) : null,
+        connectedAt: DateTime.parse(d['connected_at'] as String),
+      );
     }
 
-    if (body['connected'] != true) return null;
+    final mock = _parse('mock');
+    final real = _parse('real');
+    if (mock == null && real == null) return null;
 
-    final rawKey = body['app_key'];
-    final rawExpiry = body['token_expiry'];
-    final rawIsPaper = body['is_paper'];
-    final rawConnectedAt = body['connected_at'];
+    return KisConnection(mock: mock, real: real, useMock: real == null && mock != null);
+  }
 
-    if (rawKey is! String || rawKey.isEmpty) return null;
-    if (rawConnectedAt is! String || rawConnectedAt.isEmpty) return null;
-
-    return KisConnection(
-      appKey: rawKey,
-      appSecret: body['app_secret'] as String? ?? '',
-      accessToken: body['access_token'] as String?,
-      tokenExpiry:
-          (rawExpiry is String) ? DateTime.tryParse(rawExpiry) : null,
-      isPaper: rawIsPaper == true,
-      connectedAt: DateTime.parse(rawConnectedAt),
+  @override
+  Future<void> disconnect(String userId, {String? envType}) async {
+    await _client.delete(
+      Uri.parse('$apiBaseUrl/kis/auth'),
+      headers: _jsonHeaders,
+      body: jsonEncode({'user_id': userId, if (envType != null) 'env_type': envType}),
     );
   }
 
   @override
-  Future<void> disconnect(String userId) async {
-    final uri = Uri.parse('$apiBaseUrl/kis/auth');
-    await _client.delete(
-      uri,
-      headers: _jsonHeaders,
-      body: jsonEncode({'user_id': userId}),
-    );
+  Future<void> toggleEnv(String userId, bool useMock) async {
+    // localStorage with shared_preferences or keep in memory via BLoC
   }
 
   static const _jsonHeaders = {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/theme/font_helper.dart';
 
 import '../../shared/constants/app_constants.dart';
 
@@ -52,27 +52,15 @@ class SidebarItem extends StatelessWidget {
                     )
                   : null,
             ),
-            child: Row(
-              children: [
-                Icon(icon,
-                    size: 22,
-                    color: isSelected
-                        ? colorScheme.secondary
-                        : colorScheme.onSurfaceVariant),
-                const SizedBox(width: AppConstants.spacingSm),
-                Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: isSelected
-                        ? colorScheme.onSurface
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+            child: Row(children: [
+              Icon(icon, size: 22, color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.65)),
+              const SizedBox(width: AppConstants.spacingSm),
+              Text(label, style: inter(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.8),
+              )),
+            ]),
           ),
         ),
       ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/theme/font_helper.dart';
 
 import '../../shared/constants/app_constants.dart';
 import '../../shared/theme/app_theme.dart';
@@ -177,7 +177,7 @@ class _SidebarContent extends StatelessWidget {
     return Container(
       width: AppConstants.sidebarWidth,
       decoration: BoxDecoration(
-        gradient: AppTheme.sidebarGradient,
+        color: AppTheme.sidebarColor,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -233,7 +233,7 @@ class _SidebarContent extends StatelessWidget {
           const SizedBox(width: AppConstants.spacingSm),
           Text(
             'Beyondi',
-            style: GoogleFonts.poppins(
+            style: poppins(
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: colorScheme.onSurface,
@@ -267,10 +267,10 @@ class _SidebarContent extends StatelessWidget {
           ),
           child: Text(
             _sectionLabel(section),
-            style: GoogleFonts.inter(
+            style: inter(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              color: Colors.white.withValues(alpha: 0.5),
               letterSpacing: 0.8,
             ),
           ),
@@ -327,7 +327,7 @@ class _SidebarContent extends StatelessWidget {
               displayName.isNotEmpty
                   ? displayName[0].toUpperCase()
                   : 'G',
-              style: GoogleFonts.poppins(
+              style: poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: colorScheme.secondary,
@@ -342,16 +342,16 @@ class _SidebarContent extends StatelessWidget {
               children: [
                 Text(
                   displayName,
-                  style: GoogleFonts.inter(
+                  style: inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
+              color: Colors.white,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   displayEmail,
-                  style: GoogleFonts.inter(
+                  style: inter(
                     fontSize: 11,
                     color: colorScheme.onSurfaceVariant,
                   ),

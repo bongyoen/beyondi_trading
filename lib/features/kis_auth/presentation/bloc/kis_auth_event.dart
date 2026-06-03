@@ -1,42 +1,49 @@
 import 'package:equatable/equatable.dart';
 
-/// [KisAuthBloc]에 전달되는 이벤트.
 sealed class KisAuthEvent extends Equatable {
   const KisAuthEvent();
   @override
   List<Object?> get props => [];
 }
 
-/// 키/시크릿으로 KIS 연결 시도.
-final class KisConnectRequested extends KisAuthEvent {
+class KisConnectRequested extends KisAuthEvent {
+  final String userId;
+  final String? mockKey, mockSecret, mockAccountNo, mockProductCode;
+  final String? realKey, realSecret, realAccountNo, realProductCode;
+
   const KisConnectRequested({
-    required this.appKey,
-    required this.appSecret,
     required this.userId,
-    this.isPaper = true,
+    this.mockKey,
+    this.mockSecret,
+    this.mockAccountNo,
+    this.mockProductCode,
+    this.realKey,
+    this.realSecret,
+    this.realAccountNo,
+    this.realProductCode,
   });
 
-  final String appKey;
-  final String appSecret;
-  final String userId;
-  final bool isPaper;
-
   @override
-  List<Object?> get props => [appKey, appSecret, userId, isPaper];
+  List<Object?> get props => [userId, mockKey, realKey];
 }
 
-/// 저장된 KIS 연결 상태 조회.
-final class KisStatusRequested extends KisAuthEvent {
+class KisStatusRequested extends KisAuthEvent {
+  final String userId;
   const KisStatusRequested({required this.userId});
-  final String userId;
   @override
   List<Object?> get props => [userId];
 }
 
-/// KIS 연결 해제.
-final class KisDisconnectRequested extends KisAuthEvent {
-  const KisDisconnectRequested({required this.userId});
+class KisDisconnectRequested extends KisAuthEvent {
   final String userId;
+  const KisDisconnectRequested({required this.userId});
   @override
   List<Object?> get props => [userId];
+}
+
+class KisToggleEnv extends KisAuthEvent {
+  final bool useMock;
+  const KisToggleEnv(this.useMock);
+  @override
+  List<Object?> get props => [useMock];
 }

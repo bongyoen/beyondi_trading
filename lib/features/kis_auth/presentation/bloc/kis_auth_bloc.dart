@@ -4,10 +4,6 @@ import '../../data/repositories/kis_auth_repository.dart';
 import 'kis_auth_event.dart';
 import 'kis_auth_state.dart';
 
-/// KIS Open API 인증 상태 관리 BLoC.
-///
-/// Cloudflare Workers API를 통해 KIS 키/시크릿을 저장/조회하고
-/// KisStockApi로 직접 토큰 유효성 검증.
 class KisAuthBloc extends Bloc<KisAuthEvent, KisAuthState> {
   KisAuthBloc({required KisAuthRepository repository})
       : _repository = repository,
@@ -15,21 +11,20 @@ class KisAuthBloc extends Bloc<KisAuthEvent, KisAuthState> {
     on<KisConnectRequested>(_onConnect);
     on<KisStatusRequested>(_onStatus);
     on<KisDisconnectRequested>(_onDisconnect);
+    on<KisToggleEnv>(_onToggle);
   }
 
   final KisAuthRepository _repository;
 
-  Future<void> _onConnect(
-    KisConnectRequested event,
-    Emitter<KisAuthState> emit,
-  ) async {
+  Future<void> _onConnect(KisConnectRequested event, Emitter<KisAuthState> emit) async {
     emit(const KisAuthLoading());
     try {
       final connection = await _repository.connect(
-        appKey: event.appKey,
-        appSecret: event.appSecret,
         userId: event.userId,
-        isPaper: event.isPaper,
+        mockKey: event.mockKey, mockSecret: event.mockSecret,
+        mockAccountNo: event.mockAccountNo, mockProductCode: event.mockProductCode,
+        realKey: event.realKey, realSecret: event.realSecret,
+        realAccountNo: event.realAccountNo, realProductCode: event.realProductCode,
       );
       emit(KisAuthConnected(connection: connection));
     } catch (e) {
@@ -37,10 +32,7 @@ class KisAuthBloc extends Bloc<KisAuthEvent, KisAuthState> {
     }
   }
 
-  Future<void> _onStatus(
-    KisStatusRequested event,
-    Emitter<KisAuthState> emit,
-  ) async {
+  Future<void> _onStatus(KisStatusRequested event, Emitter<KisAuthState> emit) async {
     emit(const KisAuthLoading());
     try {
       final connection = await _repository.getConnection(event.userId);
@@ -54,11 +46,15 @@ class KisAuthBloc extends Bloc<KisAuthEvent, KisAuthState> {
     }
   }
 
-  Future<void> _onDisconnect(
-    KisDisconnectRequested event,
-    Emitter<KisAuthState> emit,
-  ) async {
+  Future<void> _onDisconnect(KisDisconnectRequested event, Emitter<KisAuthState> emit) async {
     await _repository.disconnect(event.userId);
     emit(const KisAuthDisconnected());
+  }
+
+  void _onToggle(KisToggleEnv event, Emitter<KisAuthState> emit) {
+    final current = state;
+    if (current is KisAuthConnected) {
+      emit(KisAuthConnected(connection: current.connection.copyWith(useMock: event.useMock)));
+    }
   }
 }

@@ -27,6 +27,14 @@ class KisStockApi {
   /// 마지막으로 발급받은 토큰의 만료 일시.
   DateTime? get tokenExpiry => _tokenExpiry;
 
+  String? get token => _token;
+
+  /// 기존에 발급받은 토큰을 직접 설정 (로그인 시 저장된 토큰 재사용).
+  void setToken(String token, DateTime expiry) {
+    _token = token;
+    _tokenExpiry = expiry;
+  }
+
   String get _baseUrl => isPaper
       ? 'https://openapivts.koreainvestment.com:29443'
       : 'https://openapi.koreainvestment.com:9443';
@@ -154,12 +162,16 @@ class KisStockApi {
     required String symbol,
     required DateTime date,
   }) async {
+    // 2시간 간격 4회 병렬 호출 (09:00~15:30 커버)
+    final chunks = await Future.wait(
+      ['153000', '133000', '113000', '093000'].map((t) =>
+        _fetchMinuteChunk(symbol: symbol, date: date, startTime: t)),
+    );
+    final seen = <DateTime>{};
     final all = <Candle>[];
-    // 2시간 간격으로 4회 호출 (09:00~15:30 커버)
-    for (final startTime in ['153000', '133000', '113000', '093000']) {
-      final chunk = await _fetchMinuteChunk(symbol: symbol, date: date, startTime: startTime);
+    for (final chunk in chunks) {
       for (final c in chunk) {
-        if (!all.any((e) => e.timestamp == c.timestamp)) all.add(c);
+        if (seen.add(c.timestamp)) all.add(c);
       }
     }
     all.sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -171,7 +183,7 @@ class KisStockApi {
     required String symbol,
     required DateTime date,
     required String startTime,
-    bool includePast = false,
+    bool includePast = true,
   }) async {
     final token = await getToken();
 
@@ -183,7 +195,7 @@ class KisStockApi {
       'FID_INPUT_HOUR_1': startTime,
       'FID_INPUT_DATE_1': _formatDate(date),
       'FID_PW_DATA_INCU_YN': includePast ? 'Y' : 'N',
-      'FID_FAKE_TICK_INCU_YN': '',
+      'FID_FAKE_TICK_INCU_YN': 'N',
     });
 
     final response = await _client.get(uri, headers: {
@@ -284,6 +296,170 @@ class KisStockApi {
     } catch (_) {
       return body;
     }
+  }
+
+  Map<String, String> _authHeaders(String token, String trId) => {
+    'Content-Type': 'application/json',
+    'authorization': 'Bearer $token',
+    'appkey': appKey,
+    'appsecret': appSecret,
+    'custtype': 'P',
+    'tr_id': trId,
+  };
+
+  void _checkResponse(Map<String, dynamic> body) {
+    if (body['rt_cd'] != '0') {
+      throw KisApiException(
+        'API 오류: [${body['msg_cd']}] ${body['msg1']}',
+      );
+    }
+  }
+
+  /// 주식잔고조회 - output1(종목별 리스트), output2(합계)
+  Future<(List<Map<String, dynamic>>, Map<String, dynamic>)> fetchBalance({
+    required String accountNo,
+    required String productCode,
+  }) async {
+    final token = await getToken();
+    final trId = isPaper ? 'VTTC8434R' : 'TTTC8434R';
+
+    final uri = Uri.parse(
+      '$_baseUrl/uapi/domestic-stock/v1/trading/inquire-balance',
+    ).replace(queryParameters: {
+      'CANO': accountNo,
+      'ACNT_PRDT_CD': productCode,
+      'AFHR_FLPR_YN': 'N',
+      'OFL_YN': '',
+      'INQU_DVSN': '01',
+      'UNPR_DVSN': '01',
+      'FUND_STLD_YN': 'N',
+      'FNCG_AMT_AUTO_REDCMS_YN': 'N',
+      'PRCS_DVSN': '01',
+      'COST_ICL_YN': 'N',
+      'CTX_AREA_FK100': '',
+      'CTX_AREA_NK100': '',
+    });
+
+    final res = await _client.get(uri, headers: _authHeaders(token, trId));
+    if (res.statusCode != 200) {
+      throw KisApiException('잔고조회 실패: ${res.statusCode} ${res.body}');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    _checkResponse(body);
+
+    final out1 = _safeListMap(body['output1']);
+    final out2 = _safeMap(body['output2']);
+    return (out1, out2);
+  }
+
+  static Map<String, dynamic> _safeMap(dynamic v) {
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return Map<String, dynamic>.from(v);
+    if (v is List && v.isNotEmpty) {
+      final e = v[0];
+      if (e is Map<String, dynamic>) return e;
+      if (e is Map) return Map<String, dynamic>.from(e);
+    }
+    return {};
+  }
+
+  static List<Map<String, dynamic>> _safeListMap(dynamic v) {
+    if (v is List<Map<String, dynamic>>) return v;
+    if (v is List) {
+      return v.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    if (v is Map) return [Map<String, dynamic>.from(v)];
+    return [];
+  }
+
+  /// 투자계좌자산현황조회 - 실전 only
+  Future<(Map<String, dynamic>, List<Map<String, dynamic>>)> fetchAccountAssetSummary({
+    required String accountNo,
+    required String productCode,
+  }) async {
+    final token = await getToken();
+    const trId = 'CTRP6548R';
+
+    final uri = Uri.parse(
+      '$_baseUrl/uapi/domestic-stock/v1/trading/inquire-account-balance',
+    ).replace(queryParameters: {
+      'CANO': accountNo,
+      'ACNT_PRDT_CD': productCode,
+      'INQR_DVSN': '01',
+    });
+
+    final res = await _client.get(uri, headers: _authHeaders(token, trId));
+    if (res.statusCode != 200) {
+      throw KisApiException('자산현황조회 실패: ${res.statusCode} ${res.body}');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    _checkResponse(body);
+
+    final out1 = _safeMap(body['output1']);
+    final out2 = _safeListMap(body['output2']);
+    return (out1, out2);
+  }
+
+  /// 매수가능조회
+  Future<Map<String, dynamic>> fetchBuyPower({
+    required String accountNo,
+    required String productCode,
+    String symbol = '',
+  }) async {
+    final token = await getToken();
+    final trId = isPaper ? 'VTTC8908R' : 'TTTC8908R';
+
+    final uri = Uri.parse(
+      '$_baseUrl/uapi/domestic-stock/v1/trading/inquire-psbl-order',
+    ).replace(queryParameters: {
+      'CANO': accountNo,
+      'ACNT_PRDT_CD': productCode,
+      'PDNO': '',
+      'ORD_DVSN': '00',
+      'ORD_QTY': '0',
+      'ORD_UNPR': '0',
+    });
+
+    final res = await _client.get(uri, headers: _authHeaders(token, trId));
+    if (res.statusCode != 200) {
+      throw KisApiException('매수가능조회 실패: ${res.statusCode} ${res.body}');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    _checkResponse(body);
+    return (body['output'] as Map<String, dynamic>?) ?? {};
+  }
+
+  /// 기간별매매손익현황조회 - 실전 only
+  Future<(Map<String, dynamic>, List<Map<String, dynamic>>)> fetchPeriodTradeProfit({
+    required String accountNo,
+    required String productCode,
+    required String startDate,
+    required String endDate,
+  }) async {
+    final token = await getToken();
+    const trId = 'TTTC8715R';
+
+    final uri = Uri.parse(
+      '$_baseUrl/uapi/domestic-stock/v1/trading/inquire-period-trade-profit',
+    ).replace(queryParameters: {
+      'CANO': accountNo,
+      'ACNT_PRDT_CD': productCode,
+      'SORT_DVSN': '02',
+      'INQR_STRT_DT': startDate,
+      'INQR_END_DT': endDate,
+      'CBLC_DVSN': '00',
+    });
+
+    final res = await _client.get(uri, headers: _authHeaders(token, trId));
+    if (res.statusCode != 200) {
+      throw KisApiException('기간손익조회 실패: ${res.statusCode} ${res.body}');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    _checkResponse(body);
+
+    final out1 = _safeMap(body['output1']);
+    final out2 = _safeListMap(body['output2']);
+    return (out1, out2);
   }
 
   void dispose() => _client.close();

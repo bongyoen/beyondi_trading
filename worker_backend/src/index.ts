@@ -7,11 +7,13 @@ interface User {
 
 interface KisAuth {
   user_id: string;
+  env_type: string;
   app_key: string;
   app_secret: string;
   access_token: string | null;
   token_expiry: string | null;
-  is_paper: number;
+  account_no: string | null;
+  product_code: string | null;
   connected_at: string;
 }
 
@@ -158,36 +160,41 @@ async function handleKisAuthSave(request: Request, env: Env): Promise<Response> 
   try {
     const body = (await request.json()) as {
       user_id?: string;
+      env_type?: string;
       app_key?: string;
       app_secret?: string;
       access_token?: string;
       token_expiry?: string;
-      is_paper?: boolean;
+      account_no?: string;
+      product_code?: string;
     };
 
-    if (!body.user_id || !body.app_key || !body.app_secret) {
-      return errorResponse('user_id, app_key, and app_secret are required');
+    if (!body.user_id || !body.env_type || !body.app_key || !body.app_secret) {
+      return errorResponse('user_id, env_type, app_key, and app_secret are required');
     }
 
     const now = new Date().toISOString();
 
     await env.DB.prepare(
-      `INSERT INTO kis_auth (user_id, app_key, app_secret, access_token, token_expiry, is_paper, connected_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(user_id) DO UPDATE SET
+      `INSERT INTO kis_auth (user_id, env_type, app_key, app_secret, access_token, token_expiry, account_no, product_code, connected_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, env_type) DO UPDATE SET
          app_key = excluded.app_key,
          app_secret = excluded.app_secret,
          access_token = excluded.access_token,
          token_expiry = excluded.token_expiry,
-         is_paper = excluded.is_paper,
+         account_no = excluded.account_no,
+         product_code = excluded.product_code,
          connected_at = excluded.connected_at`,
     ).bind(
       body.user_id,
+      body.env_type,
       body.app_key,
       body.app_secret,
       body.access_token || null,
       body.token_expiry || null,
-      body.is_paper === false ? 0 : 1,
+      body.account_no || null,
+      body.product_code || null,
       now,
     ).run();
 
@@ -205,33 +212,43 @@ async function handleKisAuthGet(request: Request, env: Env): Promise<Response> {
     return errorResponse('user_id query parameter is required');
   }
 
-  const auth = await env.DB.prepare(
+  const rows = await env.DB.prepare(
     'SELECT * FROM kis_auth WHERE user_id = ?',
-  ).bind(userId).first<KisAuth>();
+  ).bind(userId).all<KisAuth>();
 
-  if (!auth) {
-    return jsonResponse({ connected: false });
+  const mock = rows.results?.find(r => r.env_type === 'mock');
+  const real = rows.results?.find(r => r.env_type === 'real');
+
+  function formatAuth(a: KisAuth) {
+    return {
+      app_key: a.app_key,
+      app_secret: a.app_secret,
+      access_token: a.access_token,
+      token_expiry: a.token_expiry,
+      account_no: a.account_no,
+      product_code: a.product_code,
+      connected_at: a.connected_at,
+    };
   }
 
   return jsonResponse({
-    connected: true,
-    app_key: auth.app_key,
-    app_secret: auth.app_secret,
-    access_token: auth.access_token,
-    token_expiry: auth.token_expiry,
-    is_paper: auth.is_paper === 1,
-    connected_at: auth.connected_at,
+    mock: mock ? formatAuth(mock) : null,
+    real: real ? formatAuth(real) : null,
   });
 }
 
 async function handleKisAuthDelete(request: Request, env: Env): Promise<Response> {
   try {
-    const body = (await request.json()) as { user_id?: string };
+    const body = (await request.json()) as { user_id?: string; env_type?: string };
     if (!body.user_id) {
       return errorResponse('user_id is required');
     }
 
-    await env.DB.prepare('DELETE FROM kis_auth WHERE user_id = ?').bind(body.user_id).run();
+    if (body.env_type) {
+      await env.DB.prepare('DELETE FROM kis_auth WHERE user_id = ? AND env_type = ?').bind(body.user_id, body.env_type).run();
+    } else {
+      await env.DB.prepare('DELETE FROM kis_auth WHERE user_id = ?').bind(body.user_id).run();
+    }
     return jsonResponse({ message: 'KIS credentials deleted' });
   } catch {
     return errorResponse('Invalid request body', 400);

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/theme/font_helper.dart';
 
 import '../../shared/constants/app_constants.dart';
 import '../../shared/theme/app_theme.dart';
@@ -16,9 +16,9 @@ class UiComponentsPage extends StatelessWidget {
       child: ListView(
       padding: const EdgeInsets.all(AppConstants.spacingLg),
       children: [
-        Text('UI Components', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700)),
+        Text('UI Components', style: poppins(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
-        Text('공통 디자인 시스템', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+        Text('공통 디자인 시스템', style: inter(fontSize: 13, color: cs.onSurfaceVariant)),
         const SizedBox(height: 20),
 
         _section(cs, 'Colors', [
@@ -30,13 +30,13 @@ class UiComponentsPage extends StatelessWidget {
         ]),
 
         _section(cs, 'Typography', [
-          Text('Poppins Heading 1', style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700)),
+          Text('Poppins Heading 1', style: poppins(fontSize: 28, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text('Poppins Heading 2', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
+          Text('Poppins Heading 2', style: poppins(fontSize: 22, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          Text('Inter Body', style: GoogleFonts.inter(fontSize: 14)),
+          Text('Inter Body', style: inter(fontSize: 14)),
           const SizedBox(height: 4),
-          Text('Inter Small', style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant)),
+          Text('Inter Small', style: inter(fontSize: 11, color: cs.onSurfaceVariant)),
         ]),
 
         _section(cs, 'Buttons', [
@@ -61,10 +61,10 @@ class UiComponentsPage extends StatelessWidget {
               Row(children: [
                 Icon(Icons.info_rounded, size: 16, color: cs.primary),
                 const SizedBox(width: 6),
-                Text('Card Title', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text('Card Title', style: poppins(fontSize: 13, fontWeight: FontWeight.w600)),
               ]),
               const SizedBox(height: 8),
-              Text('Standard card with title, used throughout the app.', style: GoogleFonts.inter(fontSize: 13)),
+              Text('Standard card with title, used throughout the app.', style: inter(fontSize: 13)),
             ]),
           ),
           const SizedBox(height: 8),
@@ -77,7 +77,7 @@ class UiComponentsPage extends StatelessWidget {
               ),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text('Gradient card', style: GoogleFonts.inter(fontSize: 13, color: cs.onPrimaryContainer)),
+            child: Text('Gradient card', style: inter(fontSize: 13, color: cs.onPrimaryContainer)),
           ),
         ]),
 
@@ -129,7 +129,7 @@ class UiComponentsPage extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: cs.primary)),
+        Text(title, style: poppins(fontSize: 16, fontWeight: FontWeight.w600, color: cs.primary)),
         const SizedBox(height: 8),
         ...children,
       ]),
@@ -142,7 +142,7 @@ class UiComponentsPage extends StatelessWidget {
       child: Row(children: [
         Container(width: 32, height: 32, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6), border: Border.all(color: cs.outline.withValues(alpha: 0.2)))),
         const SizedBox(width: 12),
-        Text(label, style: GoogleFonts.inter(fontSize: 13)),
+        Text(label, style: inter(fontSize: 13)),
         const Spacer(),
         Text(color.toARGB32().toRadixString(16).padLeft(8, '0'), style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.grey)),
       ]),
@@ -152,14 +152,14 @@ class UiComponentsPage extends StatelessWidget {
   Widget _spacingBox(String label, double size) {
     return Column(children: [
       Container(width: size, height: size, color: Colors.blue.withValues(alpha: 0.3)),
-      Text(label, style: GoogleFonts.inter(fontSize: 10)),
+      Text(label, style: inter(fontSize: 10)),
     ]);
   }
 
   Widget _radiusBox(String label, double radius) {
     return Column(children: [
       Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(radius))),
-      Text(label, style: GoogleFonts.inter(fontSize: 10)),
+      Text(label, style: inter(fontSize: 10)),
     ]);
   }
 }

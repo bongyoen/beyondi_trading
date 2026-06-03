@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/theme/font_helper.dart';
 
 /// Common input field - reusable, accessible, modern.
 class CommonInputField extends StatelessWidget {
@@ -51,7 +51,7 @@ class CommonInputField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: inter(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: hasError ? colorScheme.error : colorScheme.onSurface,
@@ -72,10 +72,10 @@ class CommonInputField extends StatelessWidget {
               : (_) => FocusScope.of(context).nextFocus(),
           onChanged: onChanged,
           validator: validator,
-          style: GoogleFonts.inter(fontSize: 15),
+          style: inter(fontSize: 15),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.inter(
+            hintStyle: inter(
               fontSize: 14,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
