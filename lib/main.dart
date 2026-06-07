@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'app/app.dart';
-import 'features/auth/data/repositories/auth_repository.dart';
-import 'features/auth/presentation/bloc/login_bloc.dart';
-import 'features/counter/presentation/bloc/counter_bloc.dart';
-import 'features/kis_auth/data/repositories/kis_auth_repository.dart';
-import 'features/kis_auth/presentation/bloc/kis_auth_bloc.dart';
-import 'features/stock_search/presentation/bloc/stock_search_cubit.dart';
+import 'package:beyondi_trading/features/auth/api/auth_repository.dart';
+import 'package:beyondi_trading/features/auth/bloc/login_bloc.dart';
+import 'package:beyondi_trading/features/counter/bloc/counter_bloc.dart';
+import 'features/kis_auth/api/kis_auth_repository.dart';
+import 'features/kis_auth/bloc/kis_auth_bloc.dart';
+import 'package:beyondi_trading/features/stock_search/bloc/stock_search_cubit.dart';
 
 import 'shared/api/api_client.dart';
 import 'shared/config/app_config.dart';

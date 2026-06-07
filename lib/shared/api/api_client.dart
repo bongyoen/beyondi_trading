@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_logger.dart';
+
 /// Exception thrown when an API call fails.
 ///
 /// Carries a human-readable [message] and the HTTP [statusCode] when
@@ -53,10 +55,28 @@ class ApiClient {
   final http.Client _client;
   final Duration _timeout;
 
+  /// Sends a GET request to the given [path].
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, String>? queryParams,
+  }) async {
+    final Uri uri = Uri.parse('$baseUrl$path').replace(queryParameters: queryParams);
+
+    try {
+      final http.Response response = await _client
+          .get(uri, headers: _jsonHeaders)
+          .timeout(_timeout);
+      return _handleResponse(response);
+    } on http.ClientException catch (e) {
+      await ApiLogger.log(module: 'WORKER', method: 'GET', url: uri.toString(),
+          error: e.message);
+      throw ApiException(message: 'Network error: ${e.message}');
+    } on TimeoutException {
+      throw ApiException(message: 'Request timed out. Please try again.');
+    }
+  }
+
   /// Sends a POST request to the given [path] with an optional JSON [body].
-  ///
-  /// The [path] is appended to [baseUrl]. Returns the parsed JSON response
-  /// body as a map. Throws [ApiException] on any failure.
   Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
@@ -74,11 +94,11 @@ class ApiClient {
 
       return _handleResponse(response);
     } on http.ClientException catch (e) {
+      await ApiLogger.log(module: 'WORKER', method: 'POST', url: uri.toString(),
+          error: e.message);
       throw ApiException(message: 'Network error: ${e.message}');
     } on TimeoutException {
-      throw ApiException(
-        message: 'Request timed out. Please try again.',
-      );
+      throw ApiException(message: 'Request timed out. Please try again.');
     }
   }
 
@@ -99,22 +119,28 @@ class ApiClient {
         ? jsonDecode(response.body) as Map<String, dynamic>
         : <String, dynamic>{};
 
+    // Log (fire-and-forget, never block response parsing)
+    ApiLogger.log(
+      module: 'WORKER',
+      method: response.request?.method ?? '?',
+      url: response.request?.url.toString() ?? '',
+      code: response.statusCode,
+      summary: response.statusCode >= 200 && response.statusCode < 300 ? 'OK' : null,
+      error: response.statusCode >= 200 && response.statusCode < 300 ? null : response.body,
+      resBody: response.body.isNotEmpty ? response.body : null,
+    );
+
     // Early Exit: 2xx responses are trusted and returned immediately.
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return body;
     }
 
-    // Extract a descriptive error message from the response, falling back
-    // to a generic message if none is provided.
+    // Extract a descriptive error message
     final String message = body['error'] as String? ??
         body['message'] as String? ??
         'An unexpected error occurred. Please try again.';
 
-    // Fail Loud: throw immediately with the server's error message.
-    throw ApiException(
-      message: message,
-      statusCode: response.statusCode,
-    );
+    throw ApiException(message: message, statusCode: response.statusCode);
   }
 
   /// Closes the underlying HTTP client. Call when the client is no longer needed.

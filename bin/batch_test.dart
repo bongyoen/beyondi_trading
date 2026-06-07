@@ -155,11 +155,22 @@ List<Candle>? _loadCachedMinute(String symbol) {
   if (dir.isEmpty) return null;
   final d = Directory(dir);
   if (!d.existsSync()) return null;
-  final files = d.listSync().whereType<File>()
-      .where((f) => f.path.contains('candle_${symbol}_') && f.path.endsWith('_1d.json')).toList();
-  if (files.isEmpty) return null;
-  files.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
-  final raw = jsonDecode(files.first.readAsStringSync()) as List<dynamic>;
+
+  // _full_ 파일 우선
+  final fullFile = File('$dir\\candle_${symbol}_full_1d.json');
+  if (fullFile.existsSync()) {
+    final raw = jsonDecode(fullFile.readAsStringSync()) as List<dynamic>;
+    return raw.map((e) => _parseCandle(e as Map<String, dynamic>)).toList();
+  }
+
+  // 구형 파일 스캔 → _full_로 마이그레이션
+  final oldFiles = d.listSync().whereType<File>()
+      .where((f) => f.path.contains('candle_${symbol}_') && !f.path.contains('_full_') && f.path.endsWith('_1d.json')).toList();
+  if (oldFiles.isEmpty) return null;
+  oldFiles.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+  final raw = jsonDecode(oldFiles.first.readAsStringSync()) as List<dynamic>;
+  fullFile.writeAsStringSync(jsonEncode(raw));
+  for (final f in oldFiles) { try { f.deleteSync(); } catch (_) {} }
   return raw.map((e) => _parseCandle(e as Map<String, dynamic>)).toList();
 }
 

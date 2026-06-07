@@ -196,19 +196,33 @@ Future<List<Map<String, dynamic>>> _fetchChunk(
 
 List<Map<String, dynamic>>? _loadCached(String dir, String symbol) {
   final d = Directory(dir); if (!d.existsSync()) return null;
-  final files = d.listSync().whereType<File>()
-      .where((f) => f.path.contains('candle_${symbol}_') && f.path.endsWith('_1d.json')).toList();
-  if (files.isEmpty) return null;
-  files.sort((a,b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
-  return (jsonDecode(files.first.readAsStringSync()) as List<dynamic>).cast<Map<String, dynamic>>();
+  final fullFile = File('$dir\\candle_${symbol}_full_1d.json');
+  if (fullFile.existsSync()) {
+    return (jsonDecode(fullFile.readAsStringSync()) as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+  final oldFiles = d.listSync().whereType<File>()
+      .where((f) => f.path.contains('candle_${symbol}_') && !f.path.contains('_full_') && f.path.endsWith('_1d.json')).toList();
+  if (oldFiles.isEmpty) return null;
+  oldFiles.sort((a,b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+  final data = (jsonDecode(oldFiles.first.readAsStringSync()) as List<dynamic>).cast<Map<String, dynamic>>();
+  fullFile.writeAsStringSync(jsonEncode(data));
+  for (final f in oldFiles) { try { f.deleteSync(); } catch (_) {} }
+  return data;
 }
 
 void _saveCandles(String dir, String symbol, DateTime start, DateTime end, List<Map<String,dynamic>> candles) {
   if (candles.isEmpty) return;
-  candles.sort((a,b) => (a['t'] as String).compareTo(b['t'] as String));
-  final sf = '${start.year}${start.month.toString().padLeft(2,'0')}${start.day.toString().padLeft(2,'0')}';
-  final ef = '${end.year}${end.month.toString().padLeft(2,'0')}${end.day.toString().padLeft(2,'0')}';
-  File('$dir\\candle_${symbol}_${sf}${ef}_1d.json').writeAsStringSync(jsonEncode(candles));
+  final file = File('$dir\\candle_${symbol}_full_1d.json');
+  List<Map<String, dynamic>> existing = [];
+  if (file.existsSync()) {
+    try { existing = (jsonDecode(file.readAsStringSync()) as List<dynamic>).cast<Map<String, dynamic>>(); }
+    catch (_) {}
+  }
+  existing.addAll(candles);
+  existing.sort((a,b) => (a['t'] as String).compareTo(b['t'] as String));
+  final seen = <String>{};
+  existing.retainWhere((e) => seen.add(e['t'] as String));
+  file.writeAsStringSync(jsonEncode(existing));
 }
 
 double _detectTickSize(List<Map<String,dynamic>> candles) {

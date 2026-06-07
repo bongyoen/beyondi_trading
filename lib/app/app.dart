@@ -1,13 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../features/auth/presentation/bloc/login_bloc.dart';
-import '../features/auth/presentation/bloc/login_state.dart';
-import '../features/auth/presentation/pages/login_page.dart';
-import '../pages/shell/app_shell.dart';
-import '../shared/theme/app_theme.dart';
+import 'package:beyondi_trading/features/auth/bloc/login_bloc.dart';
+import 'package:beyondi_trading/features/auth/bloc/login_state.dart';
+// Moved to pages/auth/login/ui/
+import 'package:beyondi_trading/pages/auth/login/ui/login_page.dart';
+import 'package:beyondi_trading/pages/shell/index.dart';
+import 'package:beyondi_trading/shared/theme/app_theme.dart';
 
-// ㅁㄴㅇㅁㄴㅇ
+// ?곥꽩?뉎뀅?담뀋
 /// Root application widget.
 ///
 /// Provides theme configuration and top-level auth-aware routing.
