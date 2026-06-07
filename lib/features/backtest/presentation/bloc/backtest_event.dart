@@ -41,6 +41,7 @@ class BacktestRun extends BacktestEvent {
   final double rsiOverbought;
   final String mode;
   final double commissionPercent;
+  final double principal;
   final String symbol;
   const BacktestRun({
     required this.tickSize,
@@ -56,10 +57,11 @@ class BacktestRun extends BacktestEvent {
     required this.rsiOverbought,
     required this.mode,
     required this.commissionPercent,
+    required this.principal,
     required this.symbol,
   });
   @override
-  List<Object?> get props => [tickSize, adaptiveMode, entryThresholdTicks, takeProfitTicks, stopLossTicks];
+  List<Object?> get props => [tickSize, adaptiveMode, entryThresholdTicks, takeProfitTicks, stopLossTicks, principal];
 }
 
 class BacktestDeleteCache extends BacktestEvent {

@@ -17,9 +17,17 @@ void main(List<String> args) async {
 
   print('>>> KIS API 연결됨 ($appKey)');
 
-  // 토큰 발급
-  final token = await _getToken(appKey, appSecret, baseUrl);
-  print('>>> 토큰 발급 완료');
+  final cacheDir = '${Platform.environment['APPDATA'] ?? ''}\\com.example\\beyondi_trading';
+  final tokenFile = File('$cacheDir\\kis_token.txt');
+  var token = tokenFile.existsSync() ? tokenFile.readAsStringSync().trim() : '';
+  if (token.isEmpty) {
+    token = await _getToken(appKey, appSecret, baseUrl);
+    if (token.isEmpty) { print('토큰 발급 실패'); exit(1); }
+    tokenFile.writeAsStringSync(token);
+    print('>>> 새 토큰 발급 완료');
+  } else {
+    print('>>> 캐싱된 토큰 사용');
+  }
 
   // 테스트 종목 리스트
   final stocks = [
@@ -125,16 +133,13 @@ Future<String> _getToken(String key, String secret, String baseUrl) async {
   try {
     final req = await client.postUrl(Uri.parse('$baseUrl/oauth2/tokenP'));
     req.headers.set('Content-Type', 'application/json');
-    req.write(jsonEncode({
-      'grant_type': 'client_credentials', 'appkey': key, 'appsecret': secret,
-    }));
+    req.write(jsonEncode({'grant_type': 'client_credentials', 'appkey': key, 'appsecret': secret}));
     final res = await req.close();
     final body = await res.transform(utf8.decoder).join();
     final json = jsonDecode(body) as Map<String, dynamic>;
+    if (json['access_token'] == null) { print('토큰 발급 실패: ${json['msg1'] ?? json['error_description'] ?? body}'); return ''; }
     return json['access_token'] as String;
-  } finally {
-    client.close();
-  }
+  } finally { client.close(); }
 }
 
 Future<List<Map<String, dynamic>>> _fetchDailyCandles(

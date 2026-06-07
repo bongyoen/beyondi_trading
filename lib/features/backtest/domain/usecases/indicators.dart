@@ -166,6 +166,52 @@ List<int> calculateMacdSignal(List<Candle> candles) {
   return result;
 }
 
+/// ADX(14) 계산.
+/// [period] 기본 14
+List<double> calculateAdx(List<Candle> candles, {int period = 14}) {
+  final result = List.filled(candles.length, 0.0);
+  if (candles.length < period + 1) return result;
+
+  // True Range
+  final tr = <double>[];
+  tr.add(candles[0].high - candles[0].low);
+  for (int i = 1; i < candles.length; i++) {
+    final hl = candles[i].high - candles[i].low;
+    final hc = (candles[i].high - candles[i - 1].close).abs();
+    final lc = (candles[i].low - candles[i - 1].close).abs();
+    tr.add([hl, hc, lc].reduce((a, b) => a > b ? a : b));
+  }
+
+  // Directional Movement
+  final plusDm = <double>[];
+  final minusDm = <double>[];
+  plusDm.add(0); minusDm.add(0);
+  for (int i = 1; i < candles.length; i++) {
+    final up = candles[i].high - candles[i - 1].high;
+    final down = candles[i - 1].low - candles[i].low;
+    plusDm.add(up > down && up > 0 ? up : 0);
+    minusDm.add(down > up && down > 0 ? down : 0);
+  }
+
+  double trSum = 0, pSum = 0, mSum = 0;
+  for (int i = 0; i < period; i++) {
+    trSum += tr[i]; pSum += plusDm[i]; mSum += minusDm[i];
+  }
+
+  for (int i = period; i < candles.length; i++) {
+    trSum = trSum - trSum / period.toDouble() + tr[i];
+    pSum = pSum - pSum / period.toDouble() + plusDm[i];
+    mSum = mSum - mSum / period.toDouble() + minusDm[i];
+    final pDi = trSum > 0 ? 100.0 * pSum / trSum : 0.0;
+    final mDi = trSum > 0 ? 100.0 * mSum / trSum : 0.0;
+    final dx = (pDi + mDi) > 0 ? 100 * (pDi - mDi).abs() / (pDi + mDi) : 0.0;
+    result[i] = result[i - 1] > 0
+        ? (result[i - 1] * (period - 1) + dx) / period.toDouble()
+        : dx;
+  }
+  return result;
+}
+
 /// OBV (On-Balance Volume) 계산.
 List<double> calculateObv(List<Candle> candles) {
   final obv = List.filled(candles.length, 0.0);

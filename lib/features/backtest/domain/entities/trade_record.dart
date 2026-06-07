@@ -9,6 +9,7 @@ class TradeRecord {
     required this.exitPrice,
     required this.signal,
     required this.pnl,
+    this.commission = 0,
   });
 
   /// 진입 시각
@@ -29,6 +30,9 @@ class TradeRecord {
   /// 손익 (long: 매도가-매수가, short: 매수가-매도가)
   final double pnl;
 
+  /// 거래 수수료
+  final double commission;
+
   /// 손익률 (%)
   double get pnlPercent =>
       entryPrice == 0 ? 0 : (pnl / entryPrice) * 100;
@@ -43,13 +47,14 @@ class TradeRecord {
           entryPrice == other.entryPrice &&
           exitPrice == other.exitPrice &&
           signal == other.signal &&
-          pnl == other.pnl;
+          pnl == other.pnl &&
+          commission == other.commission;
 
   @override
   int get hashCode =>
-      Object.hash(entryTime, exitTime, entryPrice, exitPrice, signal, pnl);
+      Object.hash(entryTime, exitTime, entryPrice, exitPrice, signal, pnl, commission);
 
   @override
   String toString() =>
-      'Trade(${signal.name}, entry:$entryPrice exit:$exitPrice pnl:$pnl)';
+      'Trade(${signal.name}, entry:$entryPrice exit:$exitPrice pnl:$pnl comm:$commission)';
 }

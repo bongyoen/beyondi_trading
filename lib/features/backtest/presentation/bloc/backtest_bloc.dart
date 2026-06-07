@@ -128,6 +128,7 @@ class BacktestBloc extends Bloc<BacktestEvent, BacktestState> {
         closeAtEndOfDay: true,
         mode: event.mode,
         commissionPercent: event.commissionPercent,
+        principal: event.principal,
       );
       await _cache.saveResult(symbol: event.symbol, tickSize: event.tickSize, result: result);
       emit(BacktestCompleted(candles: candles, result: result));

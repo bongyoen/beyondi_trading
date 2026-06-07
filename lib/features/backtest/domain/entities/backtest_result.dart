@@ -10,6 +10,7 @@ class BacktestResult {
     required this.totalSignals,
     required this.maxDrawdown,
     required this.sharpeRatio,
+    this.principal = 0,
   });
 
   final List<TradeRecord> trades;
@@ -34,6 +35,12 @@ class BacktestResult {
 
   /// 샤프 비율
   final double sharpeRatio;
+
+  /// 투자 원금 (0=1주 모드)
+  final double principal;
+
+  /// 수익률 (%)
+  double get roi => principal > 0 ? netReturn / principal * 100 : 0;
 
   bool get hasTrades => trades.isNotEmpty;
 
