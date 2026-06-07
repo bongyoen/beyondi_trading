@@ -3,6 +3,8 @@ import 'package:beyondi_trading/shared/theme/font_helper.dart';
 import 'package:beyondi_trading/shared/constants/app_constants.dart';
 import 'package:beyondi_trading/shared/theme/app_theme.dart';
 import 'package:beyondi_trading/shared/ui/input_field.dart';
+import 'package:beyondi_trading/shared/ui/common_button.dart';
+import 'package:beyondi_trading/shared/ui/common_dropdown.dart';
 
 class UiComponentsPage extends StatelessWidget {
   const UiComponentsPage({super.key});
@@ -84,6 +86,33 @@ class UiComponentsPage extends StatelessWidget {
           const CommonInputField(label: 'Label', hint: 'Placeholder text'),
           const SizedBox(height: 8),
           const CommonInputField(label: 'With Error', hint: 'Error state', errorText: 'This field is required'),
+        ]),
+
+        _section(cs, 'Buttons', [
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            CommonButton(label: 'Filled', icon: Icons.check_rounded),
+            CommonButton(label: 'Outlined', icon: Icons.edit_rounded, style: CommonButtonStyle.outlined),
+            CommonButton(label: 'Text', icon: Icons.info_rounded, style: CommonButtonStyle.text),
+            CommonButton(label: 'Disabled', onPressed: null),
+          ]),
+          const SizedBox(height: 8),
+          Wrap(spacing: 4, children: [
+            CommonIconButton(icon: Icons.play_arrow_rounded, color: Colors.green, onPressed: () {}),
+            CommonIconButton(icon: Icons.pause_rounded, color: Colors.orange, onPressed: () {}),
+            CommonIconButton(icon: Icons.stop_rounded, color: Colors.red, onPressed: () {}),
+            CommonIconButton(icon: Icons.delete_outline_rounded, color: Colors.grey, onPressed: () {}),
+          ]),
+        ]),
+
+        _section(cs, 'Dropdown', [
+          CommonDropdown<String>(
+            value: 'kospi',
+            items: const [
+              DropdownItem('KOSPI', 'kospi'),
+              DropdownItem('KOSDAQ', 'kosdaq'),
+            ],
+            onChanged: (_) {},
+          ),
         ]),
 
         _section(cs, 'Gradients', [

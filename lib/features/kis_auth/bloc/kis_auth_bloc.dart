@@ -18,15 +18,6 @@ class KisAuthBloc extends Bloc<KisAuthEvent, KisAuthState> {
   final KisAuthRepository _repository;
 
   Future<void> _onConnect(KisConnectRequested event, Emitter<KisAuthState> emit) async {
-    // 1시간 이내 재연결 → 캐시된 연결 유지
-    if (state is KisAuthConnected) {
-      final prev = (state as KisAuthConnected).connection;
-      final ca = prev.active?.connectedAt;
-      if (ca != null && DateTime.now().difference(ca).inHours < 1) {
-        emit(KisAuthConnected(connection: prev.copyWith()));
-        return;
-      }
-    }
     emit(const KisAuthLoading());
     try {
       final connection = await _repository.connect(

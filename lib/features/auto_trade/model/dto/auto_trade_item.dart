@@ -53,11 +53,23 @@ class AutoTradeItem {
     'code': code,
     'name': name,
     'allocatedAmount': allocatedAmount,
+    'status': status.name,
+    if (entryPrice != null) 'entryPrice': entryPrice,
+    if (quantity != null) 'quantity': quantity,
+    if (currentPrice != null) 'currentPrice': currentPrice,
+    if (orderNo != null) 'orderNo': orderNo,
   };
 
   factory AutoTradeItem.fromJson(Map<String, dynamic> json) => AutoTradeItem(
     code: json['code'] as String? ?? '',
     name: json['name'] as String? ?? '',
     allocatedAmount: (json['allocatedAmount'] as num?)?.toInt() ?? 0,
+    status: (json['status'] as String?) != null
+        ? TradeStatus.values.firstWhere((e) => e.name == json['status'], orElse: () => TradeStatus.ready)
+        : TradeStatus.ready,
+    entryPrice: (json['entryPrice'] as num?)?.toDouble(),
+    quantity: (json['quantity'] as num?)?.toInt(),
+    currentPrice: (json['currentPrice'] as num?)?.toDouble(),
+    orderNo: json['orderNo'] as String?,
   );
 }

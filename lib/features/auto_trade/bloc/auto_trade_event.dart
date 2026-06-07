@@ -76,3 +76,7 @@ class CheckSellTime extends AutoTradeEvent {
 class RefreshPrices extends AutoTradeEvent {
   const RefreshPrices();
 }
+
+class FetchBalance extends AutoTradeEvent {
+  const FetchBalance();
+}

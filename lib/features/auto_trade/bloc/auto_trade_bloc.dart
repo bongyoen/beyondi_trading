@@ -11,11 +11,15 @@ import 'auto_trade_event.dart';
 import 'auto_trade_state.dart';
 
 class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
-  KisStockApi? _api;
-  String? _accountNo;
-  String? _productCode;
+  KisStockApi? _mockApi, _realApi;
+  String? _mockAccountNo, _realAccountNo;
+  String? _mockProductCode, _realProductCode;
   Timer? _priceTimer;
   Timer? _sellTimer;
+
+  KisStockApi? get _api => state.isPaper ? _mockApi : _realApi;
+  String? get _accountNo => state.isPaper ? _mockAccountNo : _realAccountNo;
+  String? get _productCode => state.isPaper ? _mockProductCode : _realProductCode;
 
   AutoTradeBloc() : super(const AutoTradeState()) {
     on<LoadItems>(_onLoadItems);
@@ -30,12 +34,15 @@ class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
     on<BatchStop>(_onBatchStop);
     on<CheckSellTime>(_onCheckSellTime);
     on<RefreshPrices>(_onRefreshPrices);
+    on<FetchBalance>(_onFetchBalance);
   }
 
-  void setApi(KisStockApi api, {String? accountNo, String? productCode}) {
-    _api = api;
-    _accountNo = accountNo;
-    _productCode = productCode;
+  void setApi(KisStockApi api, {String? accountNo, String? productCode, bool? isMock}) {
+    if (isMock ?? true) {
+      _mockApi = api; _mockAccountNo = accountNo; _mockProductCode = productCode;
+    } else {
+      _realApi = api; _realAccountNo = accountNo; _realProductCode = productCode;
+    }
   }
 
   String get _dir =>
@@ -69,6 +76,7 @@ class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
       await ApiLogger.log(module: 'AUTO', method: 'LOAD', url: 'auto_trade_items.json',
           summary: '${items.length}개 로드 완료');
       emit(state.copyWith(items: items, isInitialized: true));
+      add(const FetchBalance());
     } catch (e) {
       await ApiLogger.log(module: 'AUTO', method: 'LOAD', url: 'auto_trade_items.json',
           error: e.toString());
@@ -94,11 +102,11 @@ class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
   }
 
   Future<void> _onRemoveItem(RemoveItem event, Emitter<AutoTradeState> emit) async {
-    final target = state.items.firstWhere((i) => i.code == event.code);
-    if (target.status == TradeStatus.running && _api != null) {
-      try {
-        await _sell(target);
-      } catch (_) {}
+    final target = state.items.firstWhere((i) => i.code == event.code,
+        orElse: () => AutoTradeItem(code: '', name: ''));
+    if (target.code.isEmpty) return;
+    if (target.status == TradeStatus.running) {
+      await _sell(target);
     }
     final items = state.items.where((i) => i.code != event.code).toList();
     _saveItems(items);
@@ -116,6 +124,43 @@ class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
 
   Future<void> _onSetMode(SetMode event, Emitter<AutoTradeState> emit) async {
     emit(state.copyWith(isPaper: event.isPaper));
+    add(const FetchBalance());
+  }
+
+  // ---- 주문 실행 (emit-safe) ----
+
+  Future<void> _executeOrder(AutoTradeItem item, bool isBuy, Emitter<AutoTradeState> emit) async {
+    final idx = state.items.indexWhere((i) => i.code == item.code);
+    if (idx < 0) return;
+
+    if (isBuy) {
+      if (item.status != TradeStatus.ready) return;
+      try {
+        final result = await _buy(item);
+        final items = [...state.items];
+        items[idx] = items[idx].copyWith(
+          status: TradeStatus.running,
+          entryPrice: _parsePrice(result, 'buy'),
+          quantity: _parseQty(result),
+          orderNo: _parseOrderNo(result),
+        );
+        _saveItems(items);
+        emit(state.copyWith(items: items));
+      } catch (e) {
+        await ApiLogger.log(module: 'AUTO', method: 'BUY_FAIL', url: item.code, error: e.toString());
+      }
+    } else {
+      if (item.status != TradeStatus.running && item.status != TradeStatus.paused) return;
+      try {
+        await _sell(item);
+        final items = [...state.items];
+        items[idx] = items[idx].copyWith(status: TradeStatus.sold, currentPrice: null);
+        _saveItems(items);
+        emit(state.copyWith(items: items));
+      } catch (e) {
+        await ApiLogger.log(module: 'AUTO', method: 'SELL_FAIL', url: item.code, error: e.toString());
+      }
+    }
   }
 
   // ---- 개별 실행/중지/일시정지 ----
@@ -123,34 +168,13 @@ class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
   Future<void> _onItemStart(ItemStart event, Emitter<AutoTradeState> emit) async {
     final idx = state.items.indexWhere((i) => i.code == event.code);
     if (idx < 0 || state.items[idx].status != TradeStatus.ready) return;
-    try {
-      final result = await _buy(state.items[idx]);
-      final items = [...state.items];
-      items[idx] = state.items[idx].copyWith(
-        status: TradeStatus.running,
-        entryPrice: _parsePrice(result, 'buy'),
-        quantity: _parseQty(result),
-        orderNo: _parseOrderNo(result),
-      );
-      _saveItems(items);
-      emit(state.copyWith(items: items));
-    } catch (e) {
-      await ApiLogger.log(module: 'AUTO', method: 'BUY_FAIL', url: event.code, error: e.toString());
-    }
+    await _executeOrder(state.items[idx], true, emit);
   }
 
   Future<void> _onItemStop(ItemStop event, Emitter<AutoTradeState> emit) async {
     final idx = state.items.indexWhere((i) => i.code == event.code);
     if (idx < 0) return;
-    try {
-      await _sell(state.items[idx]);
-    } catch (e) {
-      await ApiLogger.log(module: 'AUTO', method: 'SELL_FAIL', url: event.code, error: e.toString());
-    }
-    final items = [...state.items];
-    items[idx] = state.items[idx].copyWith(status: TradeStatus.sold, currentPrice: null);
-    _saveItems(items);
-    emit(state.copyWith(items: items));
+    await _executeOrder(state.items[idx], false, emit);
   }
 
   Future<void> _onItemPause(ItemPause event, Emitter<AutoTradeState> emit) async {
@@ -167,21 +191,23 @@ class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
   // ---- 일괄 실행/중지 ----
 
   Future<void> _onBatchStart(BatchStart event, Emitter<AutoTradeState> emit) async {
-    emit(state.copyWith(isBatchRunning: true));
     final readyItems = state.items.where((i) => i.status == TradeStatus.ready).toList();
+    if (readyItems.isEmpty) return;
+    emit(state.copyWith(isBatchRunning: true));
     for (int i = 0; i < readyItems.length; i++) {
-      add(ItemStart(readyItems[i].code));
-      await Future.delayed(const Duration(milliseconds: 200));
+      await _executeOrder(readyItems[i], true, emit);
+      await Future.delayed(const Duration(seconds: 1));
     }
     emit(state.copyWith(isBatchRunning: false));
   }
 
   Future<void> _onBatchStop(BatchStop event, Emitter<AutoTradeState> emit) async {
-    emit(state.copyWith(isBatchRunning: true));
     final running = state.items.where((i) => i.status == TradeStatus.running).toList();
+    if (running.isEmpty) return;
+    emit(state.copyWith(isBatchRunning: true));
     for (int i = 0; i < running.length; i++) {
-      add(ItemStop(running[i].code));
-      await Future.delayed(const Duration(milliseconds: 200));
+      await _executeOrder(running[i], false, emit);
+      await Future.delayed(const Duration(seconds: 1));
     }
     emit(state.copyWith(isBatchRunning: false));
   }
@@ -216,17 +242,47 @@ class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
           changed = true;
         }
       } catch (_) {}
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 300));
     }
     if (changed) emit(state.copyWith(items: items));
+  }
+
+  Future<void> _onFetchBalance(FetchBalance event, Emitter<AutoTradeState> emit) async {
+    if (_api == null) {
+      await ApiLogger.log(module: 'AUTO', method: 'BALANCE', url: '/inquire-balance',
+          summary: 'API 없음 — 잔고조회 생략');
+      return;
+    }
+    if (_accountNo == null) {
+      await ApiLogger.log(module: 'AUTO', method: 'BALANCE', url: '/inquire-balance',
+          summary: '계좌번호 없음 — 잔고조회 생략');
+      emit(state.copyWith(availableBalance: 0));
+      return;
+    }
+    try {
+      await ApiLogger.log(module: 'AUTO', method: 'BALANCE', url: '/inquire-balance',
+          summary: '잔고조회 시작 accountNo=$_accountNo');
+      final (_, summary) = await _api!.fetchBalance(
+        accountNo: _accountNo!,
+        productCode: _productCode!,
+      );
+      final raw = summary['prvs_rcdl_excc_amt'] as String? ?? '0';
+      final balance = double.tryParse(raw) ?? 0.0;
+      await ApiLogger.log(module: 'AUTO', method: 'BALANCE', url: '/inquire-balance',
+          summary: '잔고=${balance}원');
+      emit(state.copyWith(availableBalance: balance));
+    } catch (e) {
+      await ApiLogger.log(module: 'AUTO', method: 'BALANCE', url: '/inquire-balance',
+          error: e.toString());
+    }
   }
 
   // ---- 주문 도우미 ----
 
   Future<Map<String, dynamic>> _buy(AutoTradeItem item) async {
-    if (_api == null || _accountNo == null || _productCode == null) {
-      throw Exception('API 또는 계좌 정보 없음');
-    }
+    if (_api == null) throw Exception('API 인증 정보가 없습니다. KIS 연결 후 다시 시도하세요.');
+    if (_accountNo == null) throw Exception('계좌번호가 설정되지 않았습니다. KIS 연결 정보를 확인하세요.');
+    if (_productCode == null) throw Exception('상품코드가 설정되지 않았습니다.');
     // 시장가 매수: orderDivision='01', price=0
     return await _api!.orderBuy(
       accountNo: _accountNo!,
@@ -241,7 +297,11 @@ class AutoTradeBloc extends Bloc<AutoTradeEvent, AutoTradeState> {
   }
 
   Future<void> _sell(AutoTradeItem item) async {
-    if (_api == null || _accountNo == null || _productCode == null) return;
+    if (_api == null || _accountNo == null || _productCode == null) {
+      await ApiLogger.log(module: 'AUTO', method: 'SELL_FAIL', url: item.code,
+          summary: 'API/계좌 정보 없음 — 매도 생략');
+      return;
+    }
     if (item.quantity == null || item.quantity! <= 0) return;
     await _api!.orderSell(
       accountNo: _accountNo!,

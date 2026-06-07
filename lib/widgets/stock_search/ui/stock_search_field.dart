@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:beyondi_trading/shared/theme/font_helper.dart';
+import 'package:beyondi_trading/shared/ui/common_dropdown.dart';
 import 'package:beyondi_trading/shared/data/stock_db.dart';
 import 'package:beyondi_trading/features/stock_search/bloc/stock_search_cubit.dart';
 
@@ -85,26 +86,14 @@ class _StockSearchFieldState extends State<StockSearchField> {
 
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: cs.outline.withValues(alpha: 0.3)),
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
+        CommonDropdown<String>(
+            value: state.market,
+            items: markets.map((m) => DropdownItem(m, m)).toList(),
+            onChanged: (v) {
+              context.read<StockSearchCubit>().changeMarket(v);
+              _highlightIndex = -1;
+            },
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: state.market,
-              isDense: true,
-              style: inter(fontSize: 12, color: cs.onSurface),
-              dropdownColor: cs.surfaceContainerHighest,
-              items: markets.map((m) => DropdownMenuItem(value: m, child: Text(m, style: inter(fontSize: 12, color: cs.onSurface)))).toList(),
-              onChanged: (v) {
-                context.read<StockSearchCubit>().changeMarket(v!);
-                _highlightIndex = -1;
-              },
-            ),
-          ),
-        ),
         Expanded(
           child: TextField(
             controller: _ctl,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../shared/theme/font_helper.dart';
 
 /// Common input field - reusable, accessible, modern.
@@ -21,6 +22,9 @@ class CommonInputField extends StatelessWidget {
     this.onChanged,
     this.validator,
     this.enableInteractiveSelection = true,
+    this.inputFormatters,
+    this.prefixText,
+    this.isDense = false,
   });
 
   final String label;
@@ -39,6 +43,9 @@ class CommonInputField extends StatelessWidget {
   final void Function(String)? onChanged;
   final String? Function(String?)? validator;
   final bool enableInteractiveSelection;
+  final List<TextInputFormatter>? inputFormatters;
+  final String? prefixText;
+  final bool isDense;
 
   @override
   Widget build(BuildContext context) {
@@ -49,15 +56,18 @@ class CommonInputField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: hasError ? colorScheme.error : colorScheme.onSurface,
+        if (label.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              label,
+              style: inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: hasError ? colorScheme.error : colorScheme.onSurface,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           focusNode: focusNode,
@@ -67,29 +77,31 @@ class CommonInputField extends StatelessWidget {
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           enableInteractiveSelection: enableInteractiveSelection,
+          inputFormatters: inputFormatters,
           onFieldSubmitted: onSubmitted != null
               ? (v) => onSubmitted!(v)
               : (_) => FocusScope.of(context).nextFocus(),
           onChanged: onChanged,
           validator: validator,
-          style: inter(fontSize: 15),
+          style: inter(fontSize: isDense ? 13 : 15),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: inter(
-              fontSize: 14,
+              fontSize: isDense ? 12 : 14,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
             prefixIcon: prefixIcon != null
                 ? Icon(prefixIcon, size: 20)
                 : null,
+            prefixText: prefixText,
             suffixIcon: suffixIcon,
             errorText: errorText,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
+            isDense: isDense,
+            contentPadding: isDense
+                ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6)
+                : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(isDense ? 6 : 10),
             ),
           ),
         ),

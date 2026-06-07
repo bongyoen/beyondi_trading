@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../features/auto_trade/bloc/auto_trade_bloc.dart';
 import '../../../../features/auto_trade/bloc/auto_trade_event.dart';
 import '../../../../features/auto_trade/bloc/auto_trade_state.dart';
 import '../../../../features/auto_trade/model/dto/auto_trade_item.dart';
+import '../../../../entities/kis_connection/model/kis_connection.dart';
 import '../../../../features/kis_auth/bloc/kis_auth_bloc.dart';
 import '../../../../features/kis_auth/bloc/kis_auth_state.dart';
 import '../../../../shared/api/kis_stock_api.dart';
 import '../../../../shared/theme/font_helper.dart';
 import '../../../../shared/constants/app_constants.dart';
 import '../../../../shared/ui/app_card.dart';
+import '../../../../shared/ui/common_button.dart';
+import '../../../../shared/ui/input_field.dart';
 import '../../../../shared/ui/table_row.dart';
 import '../../../widgets/stock_search/ui/stock_search_field.dart';
 
@@ -21,33 +25,34 @@ class AutoTradePage extends StatefulWidget {
 }
 
 class _AutoTradePageState extends State<AutoTradePage> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authState = context.read<KisAuthBloc>().state;
-      if (authState is KisAuthConnected) {
-        final conn = authState.connection;
-        final creds = conn.active;
-        if (creds?.accountNo != null) {
-          final api = KisStockApi(
-            appKey: creds!.appKey,
-            appSecret: creds.appSecret,
-            isPaper: conn.useMock,
-          );
-          if (creds.accessToken != null && creds.tokenExpiry != null) {
-            api.setToken(creds.accessToken!, creds.tokenExpiry!);
-          }
-          context.read<AutoTradeBloc>().setApi(api,
-            accountNo: creds.accountNo,
-            productCode: creds.productCode ?? '01',
-          );
-        }
+  String? _lastApiCredKey;
+
+  void _ensureAutoTradeApi(KisConnection conn) {
+    for (final entry in [
+      (creds: conn.mock, isMock: true),
+      (creds: conn.real, isMock: false),
+    ]) {
+      final c = entry.creds;
+      if (c == null) continue;
+      final key = '${c.appKey}|${entry.isMock}';
+      if (_lastApiCredKey == key) continue;
+      _lastApiCredKey = key;
+      final api = KisStockApi(
+        appKey: c.appKey,
+        appSecret: c.appSecret,
+        isPaper: entry.isMock,
+      );
+      if (c.accessToken != null && c.tokenExpiry != null) {
+        api.setToken(c.accessToken!, c.tokenExpiry!);
       }
-      context.read<AutoTradeBloc>().add(const LoadItems());
-      context.read<AutoTradeBloc>().startTimers();
-    });
+      context.read<AutoTradeBloc>().setApi(api,
+        accountNo: c.accountNo,
+        productCode: c.productCode ?? '01',
+        isMock: entry.isMock,
+      );
+    }
   }
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +65,8 @@ class _AutoTradePageState extends State<AutoTradePage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final authState = context.watch<KisAuthBloc>().state;
+    if (authState is KisAuthConnected) _ensureAutoTradeApi(authState.connection);
     return BlocBuilder<AutoTradeBloc, AutoTradeState>(
       builder: (ctx, state) {
         return ListView(
@@ -191,8 +198,39 @@ class _AutoTradePageState extends State<AutoTradePage> {
       ),
       child: Row(children: [
         Td(item.code, flex: 1),
-        Td(item.name, flex: 2),
-        Td(item.allocatedAmount > 0 ? '₩${_fmt(item.allocatedAmount)}' : '-', flex: 2),
+        Expanded(
+          flex: 2,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+                Text(item.currentPrice != null ? '₩${_fmt(item.currentPrice!.toInt())}' : '-',
+                    style: TextStyle(fontSize: 9, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 32,
+            child: CommonInputField(
+              label: '',
+              hint: '금액',
+              controller: TextEditingController(text: item.allocatedAmount > 0 ? '${item.allocatedAmount}' : ''),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              prefixText: '₩ ',
+              isDense: true,
+              onSubmitted: (v) {
+                final amt = int.tryParse(v) ?? 0;
+                context.read<AutoTradeBloc>().add(UpdateAmount(code: item.code, amount: amt));
+              },
+            ),
+          ),
+        ),
         Td('${item.quantity ?? '-'}', flex: 1),
         Td(item.entryPrice != null ? '₩${_fmt(item.entryPrice!.toInt())}' : '-', flex: 1),
         Td(item.currentPrice != null ? '₩${_fmt(item.currentPrice!.toInt())}' : '-', flex: 1),
@@ -209,27 +247,15 @@ class _AutoTradePageState extends State<AutoTradePage> {
       flex: 2,
       child: Row(children: [
         if (item.status == TradeStatus.ready)
-          _iconBtn(Icons.play_arrow_rounded, Colors.green, () => context.read<AutoTradeBloc>().add(ItemStart(item.code))),
+          CommonIconButton(icon: Icons.play_arrow_rounded, color: Colors.green, onPressed: () => context.read<AutoTradeBloc>().add(ItemStart(item.code))),
         if (item.status == TradeStatus.running) ...[
-          _iconBtn(Icons.pause_rounded, Colors.orange, () => context.read<AutoTradeBloc>().add(ItemPause(item.code))),
-          _iconBtn(Icons.stop_rounded, Colors.red, () => context.read<AutoTradeBloc>().add(ItemStop(item.code))),
+          CommonIconButton(icon: Icons.pause_rounded, color: Colors.orange, onPressed: () => context.read<AutoTradeBloc>().add(ItemPause(item.code))),
+          CommonIconButton(icon: Icons.stop_rounded, color: Colors.red, onPressed: () => context.read<AutoTradeBloc>().add(ItemStop(item.code))),
         ],
         if (item.status == TradeStatus.paused)
-          _iconBtn(Icons.stop_rounded, Colors.red, () => context.read<AutoTradeBloc>().add(ItemStop(item.code))),
-        _iconBtn(Icons.delete_outline_rounded, Colors.grey, () => context.read<AutoTradeBloc>().add(RemoveItem(item.code))),
+          CommonIconButton(icon: Icons.stop_rounded, color: Colors.red, onPressed: () => context.read<AutoTradeBloc>().add(ItemStop(item.code))),
+        CommonIconButton(icon: Icons.delete_outline_rounded, color: Colors.grey, onPressed: () => context.read<AutoTradeBloc>().add(RemoveItem(item.code))),
       ]),
-    );
-  }
-
-  Widget _iconBtn(IconData icon, Color color, VoidCallback onTap) {
-    return SizedBox(
-      width: 28, height: 28,
-      child: IconButton(
-        padding: EdgeInsets.zero,
-        iconSize: 16,
-        icon: Icon(icon, color: color),
-        onPressed: onTap,
-      ),
     );
   }
 
@@ -243,16 +269,17 @@ class _AutoTradePageState extends State<AutoTradePage> {
 
   Widget _actionButtons(ColorScheme cs, AutoTradeState state) {
     return Row(children: [
-      ElevatedButton.icon(
+      CommonButton(
+        label: '일괄 실행',
+        icon: Icons.play_arrow_rounded,
         onPressed: state.isBatchRunning ? null : () => context.read<AutoTradeBloc>().add(const BatchStart()),
-        icon: const Icon(Icons.play_arrow_rounded, size: 18),
-        label: const Text('일괄 실행'),
       ),
       const SizedBox(width: 12),
-      OutlinedButton.icon(
+      CommonButton(
+        label: '일괄 중지',
+        icon: Icons.stop_rounded,
+        style: CommonButtonStyle.outlined,
         onPressed: state.isBatchRunning ? null : () => context.read<AutoTradeBloc>().add(const BatchStop()),
-        icon: const Icon(Icons.stop_rounded, size: 18),
-        label: const Text('일괄 중지'),
       ),
       const Spacer(),
       Icon(Icons.access_time_rounded, size: 14, color: cs.onSurfaceVariant),

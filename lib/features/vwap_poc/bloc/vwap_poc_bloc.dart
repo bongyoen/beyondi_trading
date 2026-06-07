@@ -196,7 +196,7 @@ class VwapPocBloc extends Bloc<VwapPocEvent, VwapPocState> {
             await ApiLogger.log(module: 'SCREEN', method: 'FETCH', url: 'code=$code',
                 summary: '다운로드 실패', error: e.toString());
           }
-          await Future.delayed(const Duration(milliseconds: 100));
+          await Future.delayed(const Duration(milliseconds: 300));
         }
         if (dailyCandles.length < 10) {
           await ApiLogger.log(module: 'SCREEN', method: 'SKIP', url: 'code=$code',
