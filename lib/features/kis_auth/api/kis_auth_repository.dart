@@ -19,6 +19,7 @@ abstract class KisAuthRepository {
   Future<KisConnection?> getConnection(String userId);
   Future<void> disconnect(String userId, {String? envType});
   Future<void> toggleEnv(String userId, bool useMock);
+  Future<KisConnection> refreshToken(String userId);
 }
 
 class WorkersKisAuthRepository implements KisAuthRepository {
@@ -147,6 +148,67 @@ class WorkersKisAuthRepository implements KisAuthRepository {
   @override
   Future<void> toggleEnv(String userId, bool useMock) async {
     // localStorage with shared_preferences or keep in memory via BLoC
+  }
+
+  @override
+  Future<KisConnection> refreshToken(String userId) async {
+    await ApiLogger.log(module: 'REFRESH', method: 'START', url: '/token/refresh',
+        summary: '갱신 시작 userId=$userId');
+    final current = await getConnection(userId);
+    if (current == null) {
+      throw Exception('연결 정보가 없습니다. 먼저 KIS 연결을 설정하세요.');
+    }
+    final envType = current.useMock ? 'mock' : 'prod';
+    final creds = current.useMock ? current.mock : current.real;
+    if (creds == null) throw Exception('${current.envLabel} 자격증명이 없습니다.');
+    await ApiLogger.log(module: 'REFRESH', method: 'CONNECTION', url: '/kis/auth',
+        summary: 'env=$envType appKey=${creds.appKey.substring(0,8)}... accessToken exists=${creds.accessToken != null} tokenExpiry=${creds.tokenExpiry} connectedAt=${creds.connectedAt}');
+
+    // 항상 KIS API 호출 (setToken 하지 않음 → 캐시 미스 → oauth2/tokenP 호출)
+    final kisApi = KisStockApi(
+      appKey: creds.appKey,
+      appSecret: creds.appSecret,
+      isPaper: current.useMock,
+    );
+    final token = await kisApi.getToken();
+    final expiry = kisApi.tokenExpiry;
+
+    await ApiLogger.log(module: 'REFRESH', method: 'KISAPI', url: '/oauth2/tokenP',
+        summary: 'token=${token.substring(0, 20)}... expiry=$expiry');
+
+    // Worker 저장
+    final uri = Uri.parse('$apiBaseUrl/kis/auth');
+    final body = {
+      'user_id': userId, 'env_type': envType,
+      'app_key': creds.appKey, 'app_secret': creds.appSecret,
+      'access_token': token, 'token_expiry': expiry?.toIso8601String(),
+      'account_no': creds.accountNo, 'product_code': creds.productCode,
+    };
+    final res = await _client.post(uri, headers: _jsonHeaders, body: jsonEncode(body));
+    await ApiLogger.log(module: 'REFRESH', method: 'POST', url: '/kis/auth',
+        code: res.statusCode, summary: 'Worker 저장 결과 HTTP ${res.statusCode}',
+        error: res.statusCode != 200 ? res.body.substring(0, 200) : null);
+
+    // kis_token.txt 업데이트
+    try {
+      final f = File('${Platform.environment['APPDATA']}\\com.example\\beyondi_trading\\kis_token.txt');
+      f.writeAsStringSync(token);
+      await ApiLogger.log(module: 'REFRESH', method: 'FILE', url: '/kis_token.txt',
+          summary: '로컬 파일 저장 완료');
+    } catch (_) {}
+
+    final now = DateTime.now();
+    final newCreds = KisCredentials(
+      appKey: creds.appKey, appSecret: creds.appSecret,
+      accountNo: creds.accountNo, productCode: creds.productCode,
+      accessToken: token, tokenExpiry: expiry,
+      connectedAt: now,
+    );
+    await ApiLogger.log(module: 'REFRESH', method: 'DONE', url: '/token/refresh',
+        summary: '갱신 완료 connectedAt=$now newExpiry=$expiry');
+    return current.useMock
+        ? current.copyWith(mock: newCreds)
+        : current.copyWith(real: newCreds);
   }
 
   static const _jsonHeaders = {

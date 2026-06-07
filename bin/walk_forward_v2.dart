@@ -1,9 +1,9 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:beyondi_trading/features/backtest/domain/entities/candle.dart';
-import 'package:beyondi_trading/features/backtest/domain/usecases/run_backtest.dart';
+import 'package:beyondi_trading/entities/candle/model/candle.dart';
+import 'package:beyondi_trading/features/backtest/model/usecases/run_backtest.dart';
 
 // ---- main: Test 1 (Full Walk-Forward) + Test 2 (June 4) ----
 void main() async {

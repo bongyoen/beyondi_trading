@@ -61,6 +61,7 @@ class ApiLogger {
 
       final f = await _file();
       await f.writeAsString(line, mode: FileMode.append);
+      stdout.write(line);
     } catch (_) {
       // 로깅 실패는 무시
     }

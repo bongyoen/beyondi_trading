@@ -1,9 +1,9 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:beyondi_trading/features/backtest/domain/entities/candle.dart';
-import 'package:beyondi_trading/features/stock_search/data/stock_db.dart';
+import 'package:beyondi_trading/entities/candle/model/candle.dart';
+import 'package:beyondi_trading/shared/data/stock_db.dart';
 
 /// 캐시된 88종목 → 일봉 분석 → vwap_poc 적합도 스코어링 → Top 10 저장
 void main(List<String> args) async {

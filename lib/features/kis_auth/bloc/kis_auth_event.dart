@@ -47,3 +47,10 @@ class KisToggleEnv extends KisAuthEvent {
   @override
   List<Object?> get props => [useMock];
 }
+
+class KisRefreshRequested extends KisAuthEvent {
+  final String userId;
+  const KisRefreshRequested({required this.userId});
+  @override
+  List<Object?> get props => [userId];
+}

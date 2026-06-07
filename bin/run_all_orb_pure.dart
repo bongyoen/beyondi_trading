@@ -1,10 +1,10 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
 
-import 'package:beyondi_trading/features/backtest/domain/entities/candle.dart';
-import 'package:beyondi_trading/features/backtest/domain/usecases/run_backtest.dart';
+import 'package:beyondi_trading/entities/candle/model/candle.dart';
+import 'package:beyondi_trading/features/backtest/model/usecases/run_backtest.dart';
 
 /// 순수 ORB: range 돌파 조건만으로 백테스트 (Phase 필터 없음)
 /// runBacktest()를 호출하지 않고 직접 로직 구현

@@ -91,6 +91,8 @@ class VwapPocBloc extends Bloc<VwapPocEvent, VwapPocState> {
 
   Future<void> _fetchAndScore(Emitter<VwapPocState> emit) async {
     if (_api == null) {
+      await ApiLogger.log(module: 'SCREEN', method: 'FAIL', url: 'vwap_poc',
+          summary: 'API null — 인증 정보 없음');
       emit(const VwapPocFailure('API 인증 정보가 없습니다. KIS 연결 후 다시 시도하세요.'));
       return;
     }
@@ -98,10 +100,7 @@ class VwapPocBloc extends Bloc<VwapPocEvent, VwapPocState> {
     emit(const VwapPocLoading());
 
     try {
-      await ApiLogger.log(
-          module: 'SCREEN',
-          method: 'START',
-          url: 'vwap_poc screen',
+      await ApiLogger.log(module: 'SCREEN', method: 'START', url: 'vwap_poc screen',
           summary: '등락률순위 조회 시작');
 
       final now = DateTime.now();
@@ -111,45 +110,64 @@ class VwapPocBloc extends Bloc<VwapPocEvent, VwapPocState> {
               ? now.subtract(const Duration(days: 2))
               : now;
       final lastBizDay = DateTime(lastBiz.year, lastBiz.month, lastBiz.day);
+      await ApiLogger.log(module: 'SCREEN', method: 'DATE', url: 'vwap_poc',
+          summary: 'now=$now lastBizDay=$lastBizDay');
 
       // 등락률순위 Top 50
+      await ApiLogger.log(module: 'SCREEN', method: 'CALL', url: '/ranking/fluctuation',
+          summary: 'fetchFluctuationRank(divCode=000, count=50) 시작');
+      await Future.delayed(const Duration(milliseconds: 300));
       List<Map<String, dynamic>> rankData;
       try {
         rankData = await _api!.fetchFluctuationRank(divCode: '000', count: 50);
+        await ApiLogger.log(module: 'SCREEN', method: 'CALL', url: '/ranking/fluctuation',
+            summary: '성공: ${rankData.length}개 종목 조회됨');
       } catch (e) {
         rankData = [];
-        await ApiLogger.log(
-            module: 'SCREEN',
-            method: 'GET',
-            url: '/ranking/fluctuation',
-            error: e.toString());
+        await ApiLogger.log(module: 'SCREEN', method: 'CALL', url: '/ranking/fluctuation',
+            summary: '실패', error: e.toString());
       }
 
       // API 실패 → 캐시 fallback
       if (rankData.isEmpty) {
+        await ApiLogger.log(module: 'SCREEN', method: 'FALLBACK', url: 'vwap_poc',
+            summary: 'rankData=0건 → 캐시 fallback 시도');
         final cached = await _loadCache();
         if (cached != null) {
+          await ApiLogger.log(module: 'SCREEN', method: 'FALLBACK', url: 'vwap_poc',
+              summary: '캐시 사용: ${cached.items.length}개, lastUpdated=${cached.lastUpdated}');
           emit(VwapPocLoaded(items: cached.items, lastUpdated: cached.lastUpdated));
           return;
         }
+        await ApiLogger.log(module: 'SCREEN', method: 'FALLBACK', url: 'vwap_poc',
+            summary: '캐시도 없음 → 실패');
         emit(const VwapPocFailure('등락률순위 API 조회 실패'));
         return;
       }
 
-      // 종목명 맵
+      // 종목명 — stockDb 우선, API 응답명 fallback
       final nameMap = <String, String>{};
-      for (final s in stockDb) {
-        nameMap[s.code] = s.name;
-      }
+      for (final s in stockDb) { nameMap[s.code] = s.name; }
+      await ApiLogger.log(module: 'SCREEN', method: 'NAMEMAP', url: 'vwap_poc',
+          summary: 'stockDb ${stockDb.length}개 로드 완료');
 
       final results = <VwapPocItem>[];
       final startDate = lastBizDay.subtract(const Duration(days: 25));
+      await ApiLogger.log(module: 'SCREEN', method: 'LOOP', url: 'vwap_poc',
+          summary: '랭킹 ${rankData.length}개 스캔 시작, startDate=$startDate');
 
       for (final item in rankData) {
         final code = (item['stck_shrn_iscd'] ?? '') as String;
         if (code.isEmpty) continue;
 
+        // API 응답의 종목명 우선 (stockDb보다 더 포괄적)
+        final apiName = (item['hts_kor_isnm'] ?? '') as String;
+        final name = apiName.isNotEmpty ? apiName : (nameMap[code] ?? code);
+
         var dailyCandles = _loadDailyCandles(code);
+        await ApiLogger.log(module: 'SCREEN', method: 'STOCK', url: 'code=$code',
+            summary: '일봉 캐시: ${dailyCandles.length}개');
+
         final lastCandleDay = dailyCandles.isNotEmpty
             ? DateTime(dailyCandles.last.timestamp.year,
                 dailyCandles.last.timestamp.month,
@@ -157,21 +175,34 @@ class VwapPocBloc extends Bloc<VwapPocEvent, VwapPocState> {
             : null;
 
         if (lastCandleDay == null || lastCandleDay.isBefore(lastBizDay)) {
+          await ApiLogger.log(module: 'SCREEN', method: 'FETCH', url: 'code=$code',
+              summary: '캐시 부족 → API 다운로드, lastCandleDay=$lastCandleDay, end=$lastBizDay');
           try {
             final start = lastCandleDay != null
                 ? lastCandleDay.add(const Duration(days: 1))
                 : startDate;
-            final chunk =
-                await _api!.fetchDailyCandles(symbol: code, start: start, end: lastBizDay);
+            final chunk = await _api!.fetchDailyCandles(symbol: code, start: start, end: lastBizDay);
             if (chunk.isNotEmpty) {
               dailyCandles.addAll(chunk);
               dailyCandles.sort((a, b) => a.timestamp.compareTo(b.timestamp));
               _saveDailyCandles(code, dailyCandles);
+              await ApiLogger.log(module: 'SCREEN', method: 'FETCH', url: 'code=$code',
+                  summary: '${chunk.length}개 다운로드 완료, 총 ${dailyCandles.length}개');
+            } else {
+              await ApiLogger.log(module: 'SCREEN', method: 'FETCH', url: 'code=$code',
+                  summary: '다운로드 0개');
             }
-          } catch (_) {}
+          } catch (e) {
+            await ApiLogger.log(module: 'SCREEN', method: 'FETCH', url: 'code=$code',
+                summary: '다운로드 실패', error: e.toString());
+          }
           await Future.delayed(const Duration(milliseconds: 100));
         }
-        if (dailyCandles.length < 10) continue;
+        if (dailyCandles.length < 10) {
+          await ApiLogger.log(module: 'SCREEN', method: 'SKIP', url: 'code=$code',
+              summary: '일봉 ${dailyCandles.length}개 < 10 → 스킵');
+          continue;
+        }
 
         final closes = dailyCandles.map((c) => c.close).toList();
         final avgPrice = closes.reduce((a, b) => a + b) / closes.length;
@@ -179,54 +210,51 @@ class VwapPocBloc extends Bloc<VwapPocEvent, VwapPocState> {
         final tickSize = _tickSize(avgPrice);
         final vwap = _calcDailyVwap(dailyCandles);
         final ci = _calcDailyCi(dailyCandles);
-        final vwapSlope =
-            vwap.length >= 5 ? (vwap.last - vwap[vwap.length - 5]) / 5 : 0.0;
+        final vwapSlope = vwap.length >= 5 ? (vwap.last - vwap[vwap.length - 5]) / 5 : 0.0;
         final vwapDist = (lastClose - vwap.last).abs() / tickSize;
-        final periodReturn = closes.length > 1
-            ? (closes.last - closes.first) / closes.first * 100
-            : 0.0;
+        final periodReturn = closes.length > 1 ? (closes.last - closes.first) / closes.first * 100 : 0.0;
         final atr5 = _calcDailyAtr(dailyCandles, 5);
-        final atr20 = _calcDailyAtr(
-            dailyCandles, closes.length > 20 ? 20 : closes.length);
+        final atr20 = _calcDailyAtr(dailyCandles, closes.length > 20 ? 20 : closes.length);
         final atrRatio = atr20 > 0 ? atr5 / atr20 : 1.0;
 
         int score = 0;
-        if (ci < 50) score += 3;
-        else if (ci >= 52) score -= 1;
+        if (ci < 50) score += 3; else if (ci >= 52) score -= 1;
         if (vwapDist >= 3 && vwapDist <= 20) score += 2;
         if (periodReturn > 0) score += 2;
         if (vwapSlope > 0) score += 2;
         if (atrRatio >= 0.8) score += 1;
 
+        await ApiLogger.log(module: 'SCREEN', method: 'SCORE', url: 'code=$code',
+            summary: 'score=$score ci=$ci vwapDist=$vwapDist vwapSlope=$vwapSlope periodReturn=$periodReturn atrRatio=$atrRatio lastClose=$lastClose');
+
         results.add(VwapPocItem(
-          code: code,
-          name: nameMap[code] ?? code,
-          score: score,
-          ci: ci,
-          vwapDist: vwapDist,
-          vwapSlope: vwapSlope,
-          periodReturn: periodReturn,
-          atrRatio: atrRatio,
-          close: lastClose,
-          vwap: vwap.last,
+          code: code, name: name,
+          score: score, ci: ci, vwapDist: vwapDist, vwapSlope: vwapSlope,
+          periodReturn: periodReturn, atrRatio: atrRatio, close: lastClose, vwap: vwap.last,
         ));
       }
+
+      await ApiLogger.log(module: 'SCREEN', method: 'LOOP', url: 'vwap_poc',
+          summary: '전체 스캔 완료: ${results.length}개 종목 점수 산출됨');
 
       results.sort((a, b) => b.score.compareTo(a.score));
       final top10 = results.take(10).toList();
 
-      await ApiLogger.log(
-          module: 'SCREEN',
-          method: 'DONE',
-          url: 'vwap_poc screen',
-          summary: '${results.length}개 종목 분석 완료, Top 10 저장');
+      await ApiLogger.log(module: 'SCREEN', method: 'TOP10', url: 'vwap_poc',
+          summary: 'Top 10: ${top10.map((e) => '${e.code}(${e.score})').join(', ')}');
 
       _saveCache(top10, lastBizDay);
+      await ApiLogger.log(module: 'SCREEN', method: 'SAVE', url: 'vwap_poc',
+          summary: '캐시 저장 완료: ${top10.length}개');
 
       emit(VwapPocLoaded(items: top10, lastUpdated: lastBizDay));
     } catch (e) {
+      await ApiLogger.log(module: 'SCREEN', method: 'ERROR', url: 'vwap_poc',
+          summary: '스크리닝 치명적 실패', error: e.toString());
       final cache = await _loadCache();
       if (cache != null) {
+        await ApiLogger.log(module: 'SCREEN', method: 'ERROR', url: 'vwap_poc',
+            summary: '캐시 fallback: ${cache.items.length}개');
         emit(VwapPocLoaded(items: cache.items, lastUpdated: cache.lastUpdated));
       } else {
         emit(VwapPocFailure('스크리닝 실패: $e'));

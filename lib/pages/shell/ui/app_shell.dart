@@ -6,10 +6,13 @@ import 'package:beyondi_trading/features/auth/bloc/login_state.dart';
 import 'package:beyondi_trading/features/auth/bloc/login_bloc.dart';
 import 'package:beyondi_trading/features/kis_auth/bloc/kis_auth_bloc.dart';
 import 'package:beyondi_trading/features/kis_auth/bloc/kis_auth_event.dart';
+import 'package:beyondi_trading/features/kis_auth/bloc/kis_auth_state.dart';
 import 'package:beyondi_trading/widgets/kis_status_badge/ui/kis_status_badge.dart';
 import 'package:beyondi_trading/shared/constants/app_constants.dart';
 import 'package:beyondi_trading/shared/theme/app_theme.dart';
 import 'package:beyondi_trading/widgets/sidebar/ui/responsive_sidebar.dart';
+import 'package:beyondi_trading/features/auto_trade/bloc/auto_trade_bloc.dart';
+import 'package:beyondi_trading/pages/auto_trade/index.dart';
 import 'package:beyondi_trading/pages/analysis/index.dart';
 import 'package:beyondi_trading/pages/backtest/index.dart';
 import 'package:beyondi_trading/pages/home/index.dart';
@@ -23,7 +26,9 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
+  final AutoTradeBloc _autoTradeBloc = AutoTradeBloc();
   int _selectedIndex = 0;
+  bool _justRefreshed = false;
 
   static Widget _ph(String title, IconData icon) {
     return Center(
@@ -42,6 +47,7 @@ class _AppShellState extends State<AppShell> {
     _ph('포트폴리오', Icons.pie_chart_rounded),
     _ph('마켓', Icons.show_chart_rounded),
     const TradingPage(),
+    const AutoTradePage(),
     const AnalysisPage(),
     const BacktestPage(),
     const UiComponentsPage(),
@@ -49,7 +55,7 @@ class _AppShellState extends State<AppShell> {
   ];
 
   static const List<String> _titles = [
-    '대시보드', '포트폴리오', '마켓', '거래', '분석', '백테스트', 'UI 컴포넌트', '설정',
+    '대시보드', '포트폴리오', '마켓', '거래', '자동거래', '분석', '백테스트', 'UI 컴포넌트', '설정',
   ];
 
   User? get _user {
@@ -59,9 +65,32 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final mobile = MediaQuery.of(context).size.width < AppConstants.mobileBreakpoint;
-    return LayoutBuilder(
-      builder: (_, _) => mobile ? _mobile() : _desktop(),
+    return BlocProvider.value(
+      value: _autoTradeBloc,
+      child: Scaffold(
+      body: BlocListener<KisAuthBloc, KisAuthState>(
+        listener: (ctx, state) {
+        if (_justRefreshed && state is KisAuthConnected) {
+          _justRefreshed = false;
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            SnackBar(content: const Text('토큰 갱신 완료'), duration: const Duration(seconds: 2)),
+          );
+        }
+        if (_justRefreshed && state is KisAuthFailure) {
+          _justRefreshed = false;
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            SnackBar(content: Text(state.message), backgroundColor: Colors.orange.shade700, duration: const Duration(seconds: 3)),
+          );
+        }
+      },
+      child: LayoutBuilder(
+        builder: (context, _) {
+          final mobile = MediaQuery.of(context).size.width < AppConstants.mobileBreakpoint;
+          return mobile ? _mobile() : _desktop();
+        },
+      ),
+    ),
+    ),
     );
   }
 
@@ -151,7 +180,10 @@ class _AppShellState extends State<AppShell> {
           IconButton(
             icon: Icon(Icons.refresh_rounded, size: 16, color: cs.onSurfaceVariant),
             tooltip: 'KIS 토큰 갱신',
-            onPressed: () => context.read<KisAuthBloc>().add(KisStatusRequested(userId: _user!.id)),
+            onPressed: () {
+              _justRefreshed = true;
+              context.read<KisAuthBloc>().add(KisRefreshRequested(userId: _user!.id));
+            },
           ),
         SizedBox(width: 4),
         IconButton(icon: Icon(Icons.notifications_outlined, size: 20, color: cs.onSurfaceVariant), onPressed: () {}),

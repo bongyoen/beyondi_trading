@@ -44,6 +44,11 @@ const List<_SidebarDestination> _destinations = [
     section: SidebarSection.tools,
   ),
   _SidebarDestination(
+    icon: Icons.sync_alt_rounded,
+    label: '자동거래',
+    section: SidebarSection.tools,
+  ),
+  _SidebarDestination(
     icon: Icons.analytics_rounded,
     label: '분석',
     section: SidebarSection.tools,

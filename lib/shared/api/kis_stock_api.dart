@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_logger.dart';
 import 'package:beyondi_trading/entities/candle/model/candle.dart';
 
 /// 한국투자증권 KIS Open API REST 클라이언트.
@@ -46,8 +47,13 @@ class KisStockApi {
     if (_token != null &&
         _tokenExpiry != null &&
         DateTime.now().isBefore(_tokenExpiry!)) {
+      await ApiLogger.log(module: 'TOKEN', method: 'CACHE', url: '/oauth2/tokenP',
+          summary: '캐시 사용: 만료까지 ${_tokenExpiry!.difference(DateTime.now()).inMinutes}분');
       return _token!;
     }
+
+    await ApiLogger.log(module: 'TOKEN', method: 'CALL', url: '/oauth2/tokenP',
+        summary: 'KIS API 직접 호출 appKey=${appKey.substring(0,8)}... isPaper=$isPaper');
 
     final uri = Uri.parse('$_baseUrl/oauth2/tokenP');
     final response = await _client.post(
@@ -92,6 +98,8 @@ class KisStockApi {
         ? DateTime.tryParse(rawExpired)
         : null;
 
+    await ApiLogger.log(module: 'TOKEN', method: 'SUCCESS', url: '/oauth2/tokenP',
+        summary: '토큰=$_token expiry=$_tokenExpiry');
     return _token!;
   }
 
@@ -620,31 +628,66 @@ class KisStockApi {
     required int count,
   }) async {
     final token = await getToken();
-    const trId = 'FHKST03020100';
+    const trId = 'FHPST01700000';
 
     final uri = Uri.parse(
       '$_baseUrl/uapi/domestic-stock/v1/ranking/fluctuation',
     ).replace(queryParameters: {
       'fid_rsfl_rate2': '',
       'fid_cond_mrkt_div_code': 'J',
-      'fid_cond_scr_div_code': divCode,
-      'fid_input_iscd': '000000',
+      'fid_cond_scr_div_code': '20170',
+      'fid_input_iscd': '0000',
       'fid_rank_sort_cls_code': '0',
       'fid_input_cnt_1': count.toString(),
-      'fid_prc_cls_code': '1',
-      'fid_input_price_1': '',
-      'fid_input_price_2': '',
-      'fid_vol_cnt': '',
-      'fid_trm_cls_code': '0',
+      'fid_prc_cls_code': '0',
+      'fid_input_price_1': '0',
+      'fid_input_price_2': '1000000',
+      'fid_vol_cnt': '100000',
+      'fid_trgt_cls_code': '0',
+      'fid_trgt_exls_cls_code': '0',
+      'fid_div_cls_code': '0',
+      'fid_rsfl_rate1': '0',
     });
 
+    await ApiLogger.log(module: 'RANK', method: 'START', url: uri.toString(),
+        summary: 'baseUrl=$_baseUrl isPaper=$isPaper trId=$trId token=${token.length > 15 ? token.substring(0, 15) : token}...');
+
     final res = await _client.get(uri, headers: _authHeaders(token, trId));
+
+    await ApiLogger.log(module: 'RANK', method: 'RESPONSE', url: '/ranking/fluctuation',
+        code: res.statusCode,
+        summary: 'HTTP ${res.statusCode} bodyLength=${res.body.length}',
+        resBody: res.body.length > 200 ? res.body.substring(0, 200) : res.body);
+
     if (res.statusCode != 200) {
       throw KisApiException('등락률순위 조회 실패: ${res.statusCode} ${res.body}');
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
+    await ApiLogger.log(module: 'RANK', method: 'PARSE', url: '/ranking/fluctuation',
+        summary: 'rt_cd=${body['rt_cd']} msg_cd=${body['msg_cd']} msg1=${body['msg1']} output 건수=${(body['output'] as List?)?.length}');
     _checkResponse(body);
     return _safeListMap(body['output']);
+  }
+
+  /// 주식 현재가 조회
+  Future<Map<String, dynamic>> inquirePrice(String symbol) async {
+    final token = await getToken();
+    const trId = 'FHKST01010100';
+
+    final uri = Uri.parse(
+      '$_baseUrl/uapi/domestic-stock/v1/quotations/inquire-price',
+    ).replace(queryParameters: {
+      'FID_COND_MRKT_DIV_CODE': 'J',
+      'FID_INPUT_ISCD': symbol,
+    });
+
+    final res = await _client.get(uri, headers: _authHeaders(token, trId));
+    if (res.statusCode != 200) {
+      throw KisApiException('현재가 조회 실패: ${res.statusCode} ${res.body}');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    _checkResponse(body);
+    return _safeMap(body['output']);
   }
 
   void dispose() => _client.close();

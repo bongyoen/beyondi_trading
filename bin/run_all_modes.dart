@@ -1,10 +1,10 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
 
-import 'package:beyondi_trading/features/backtest/domain/entities/candle.dart';
-import 'package:beyondi_trading/features/backtest/domain/usecases/run_backtest.dart';
+import 'package:beyondi_trading/entities/candle/model/candle.dart';
+import 'package:beyondi_trading/features/backtest/model/usecases/run_backtest.dart';
 
 void main(List<String> args) async {
   final cacheDir = '${Platform.environment['APPDATA'] ?? ''}\\com.example\\beyondi_trading';

@@ -13,6 +13,8 @@ import 'package:beyondi_trading/features/vwap_poc/model/dto/vwap_poc_item.dart';
 import 'package:beyondi_trading/features/vwap_poc/bloc/vwap_poc_bloc.dart';
 import 'package:beyondi_trading/features/vwap_poc/bloc/vwap_poc_event.dart';
 import 'package:beyondi_trading/features/vwap_poc/bloc/vwap_poc_state.dart';
+import 'package:beyondi_trading/features/auto_trade/bloc/auto_trade_bloc.dart';
+import 'package:beyondi_trading/features/auto_trade/bloc/auto_trade_event.dart';
 import 'package:beyondi_trading/shared/constants/app_constants.dart';
 import 'package:beyondi_trading/shared/theme/font_helper.dart';
 
@@ -35,24 +37,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authState = context.read<KisAuthBloc>().state;
-      if (authState is KisAuthConnected) {
-        final creds = authState.connection.active;
-        if (creds != null) {
-          final api = KisStockApi(
-            appKey: creds.appKey,
-            appSecret: creds.appSecret,
-            isPaper: authState.connection.useMock,
-          );
-          if (creds.accessToken != null && creds.tokenExpiry != null) {
-            api.setToken(creds.accessToken!, creds.tokenExpiry!);
-          }
-          _vwapPocBloc.setApi(api);
-          _vwapPocBloc.add(const VwapPocRequested());
-        }
-      }
-    });
   }
 
   @override
@@ -71,6 +55,7 @@ class _HomePageState extends State<HomePage> {
     final hasAccount = creds?.accountNo != null;
 
     _ensureFetch(authState);
+    _setupVwapPoc(authState);
 
     return BlocProvider.value(
       value: _vwapPocBloc,
@@ -149,6 +134,32 @@ class _HomePageState extends State<HomePage> {
   }
 
   String? _lastCredKey;
+  String? _vwapCredKey;
+
+  void _setupVwapPoc(KisAuthState authState) {
+    if (authState is KisAuthConnected) {
+      final conn = authState.connection;
+      final creds = conn.active;
+      if (creds != null) {
+        final key = '${creds.appKey}|${conn.useMock}';
+        if (_vwapCredKey != key) {
+          _vwapCredKey = key;
+          final api = KisStockApi(
+            appKey: creds.appKey,
+            appSecret: creds.appSecret,
+            isPaper: conn.useMock,
+          );
+          if (creds.accessToken != null && creds.tokenExpiry != null) {
+            api.setToken(creds.accessToken!, creds.tokenExpiry!);
+          }
+          _vwapPocBloc.setApi(api);
+          _vwapPocBloc.add(const VwapPocRequested());
+        }
+      }
+    } else {
+      _vwapCredKey = null;
+    }
+  }
 
   void _ensureFetch(KisAuthState authState) {
     if (authState is KisAuthConnected) {
@@ -420,16 +431,43 @@ class _HomePageState extends State<HomePage> {
               final trend = item.vwapSlope > 0 ? '상승' : item.vwapSlope < 0 ? '하락' : '횡보';
               final rankColor = i < 3 ? Colors.orange : Colors.grey;
               final isGood = item.score >= 7;
-              return Container(
-                color: isGood ? Colors.green.withValues(alpha: 0.05) : Colors.transparent,
-                child: Row(children: [
-                  _vwapTd('${i + 1}', cs, flex: 1, color: rankColor, bold: i < 3),
-                  _vwapTd(item.code, cs, flex: 1),
-                  _vwapTd(item.name, cs, flex: 2),
-                  _vwapTd('${item.score}/10', cs, flex: 1, color: isGood ? Colors.green : Colors.grey),
-                  _vwapTd('${item.periodReturn >= 0 ? '+' : ''}${item.periodReturn.toStringAsFixed(1)}%', cs, flex: 1, color: item.periodReturn >= 0 ? Colors.red : Colors.blue),
-                  _vwapTd(trend, cs, flex: 1, color: item.vwapSlope > 0 ? Colors.red : Colors.blue),
-                ]),
+              return GestureDetector(
+                onSecondaryTapDown: (details) {
+                  showMenu(context: context,
+                    position: RelativeRect.fromLTRB(
+                      details.globalPosition.dx,
+                      details.globalPosition.dy,
+                      details.globalPosition.dx + 1,
+                      details.globalPosition.dy + 1,
+                    ),
+                    items: [
+                      PopupMenuItem(
+                        value: 'register',
+                        child: Row(children: [
+                          Icon(Icons.sync_alt_rounded, size: 16, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Flexible(child: Text('${item.code} ${item.name} - 자동거래등록',
+                              style: inter(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                        ]),
+                      ),
+                    ],
+                  ).then((v) {
+                    if (v == 'register') {
+                      context.read<AutoTradeBloc>().add(AddItem(code: item.code, name: item.name));
+                    }
+                  });
+                },
+                child: Container(
+                  color: isGood ? Colors.green.withValues(alpha: 0.05) : Colors.transparent,
+                  child: Row(children: [
+                    _vwapTd('${i + 1}', cs, flex: 1, color: rankColor, bold: i < 3),
+                    _vwapTd(item.code, cs, flex: 1),
+                    _vwapTd(item.name, cs, flex: 2),
+                    _vwapTd('${item.score}/10', cs, flex: 1, color: isGood ? Colors.green : Colors.grey),
+                    _vwapTd('${item.periodReturn >= 0 ? '+' : ''}${item.periodReturn.toStringAsFixed(1)}%', cs, flex: 1, color: item.periodReturn >= 0 ? Colors.red : Colors.blue),
+                    _vwapTd(trend, cs, flex: 1, color: item.vwapSlope > 0 ? Colors.red : Colors.blue),
+                  ]),
+                ),
               );
             },
           ),

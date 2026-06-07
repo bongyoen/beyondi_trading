@@ -2,9 +2,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:beyondi_trading/app/app.dart';
-import 'package:beyondi_trading/features/auth/data/repositories/auth_repository.dart';
-import 'package:beyondi_trading/features/auth/presentation/bloc/login_bloc.dart';
-import 'package:beyondi_trading/features/counter/presentation/bloc/counter_bloc.dart';
+import 'package:beyondi_trading/features/auth/api/auth_repository.dart';
+import 'package:beyondi_trading/features/auth/bloc/login_bloc.dart';
+import 'package:beyondi_trading/features/counter/bloc/counter_bloc.dart';
 
 void main() {
   testWidgets('App renders login page on startup', (WidgetTester tester) async {
